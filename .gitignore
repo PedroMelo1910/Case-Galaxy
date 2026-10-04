@@ -1,0 +1,30 @@
+# Segredos: só o modelo sem valores é versionado
+.env
+.env.*
+!.env.example
+
+# Ambiente virtual e build
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Caches de Python e de ferramentas
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Dados coletados, modelos treinados e registros de experimentos: nunca versionados
+data/
+models/
+mlruns/
+mlflow.db
+
+# Sistema e editores
+Thumbs.db
+desktop.ini
+*:Zone.Identifier
+.vscode/
+.idea/
