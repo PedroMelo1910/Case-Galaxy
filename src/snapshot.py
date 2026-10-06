@@ -76,7 +76,7 @@ def _sha256(arquivo: Path) -> str:
     return hashlib.sha256(arquivo.read_bytes()).hexdigest()
 
 
-def _estado_do_codigo() -> dict:
+def estado_do_codigo() -> dict:
     """Identifica o código e o ambiente mesmo sem commit: SHA-256 dos arquivos e versões instaladas."""
     arquivos = [*sorted((RAIZ_PROJETO / "src").glob("*.py")), RAIZ_PROJETO / "pyproject.toml", RAIZ_PROJETO / "uv.lock"]
     return {
@@ -190,7 +190,7 @@ def proveniencia(
             "status_permitidos": sorted(status_permitidos) if status_permitidos is not None else None,
             "status_por_canal": {i: status_da_lista.get(i) for i in resultado.canais_solicitados},
         },
-        "codigo": _estado_do_codigo(),
+        "codigo": estado_do_codigo(),
         "cota": {"unidades_consumidas": resultado.unidades_cota, "custo_por_chamada": CUSTO_POR_CHAMADA},
         "contagens": resultado.resumo(),
         "canais": _situacao_dos_canais(resultado),

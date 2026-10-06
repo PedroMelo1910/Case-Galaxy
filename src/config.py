@@ -33,3 +33,8 @@ class Configuracao(BaseSettings):
         if self.youtube_api_key is None:
             raise ChaveAusente("YOUTUBE_API_KEY não está definida no .env (ver README, seção 'Chaves de API').")
         return self.youtube_api_key
+
+    def chave_gemini(self) -> SecretStr:
+        if self.gemini_api_key is None:
+            raise ChaveAusente("GEMINI_API_KEY não está definida no .env (ver README, seção 'Chaves de API').")
+        return self.gemini_api_key
