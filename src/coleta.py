@@ -44,6 +44,15 @@ DIAS_JANELA_ALVOS = 365  # alvos publicados nos 12 meses até a coleta, menos os
 DIAS_HISTORICO_EXTRA = 183  # 6 meses anteriores aos alvos, só para histórico do canal
 MINIMO_SHORTS_POR_CANAL = 20
 PAIS_EXIGIDO = "BR"
+# Canais aprovados que a API publica sem país, com atuação brasileira comprovada por fonte externa (coluna
+# `evidencia` de configs/canais.csv). Valem só com o país ausente: país informado diferente de BR continua excluindo.
+CANAIS_EXCECAO_PAIS = frozenset(
+    {
+        "UCtDew4iI18GOrvPXrvhXzhw",  # Peugeot Brasil
+        "UCsitysA6ZME95b0j5uoAe9Q",  # Toyota do Brasil
+        "UCcHR0RvLYk33ppkjBw3UaEA",  # Mari Maria
+    }
+)
 PRIORIDADE_THUMBNAIL = ("maxres", "standard", "high", "medium", "default")
 FORMATO_SNAPSHOT = "%Y%m%dT%H%M%SZ"
 
@@ -449,8 +458,18 @@ def coletar(
     )
 
 
+def pais_aceito_por_excecao(canal: CanalColetado) -> bool:
+    """Verdadeiro quando a API não informa país e o canal está em CANAIS_EXCECAO_PAIS.
+
+    Só o critério de país fica atendido; os demais critérios de elegibilidade continuam valendo. O país observado
+    continua registrado como ausente.
+    """
+    return canal.pais is None and canal.channel_id in CANAIS_EXCECAO_PAIS
+
+
 def avaliar_canais(resultado: ResultadoColeta) -> dict[str, MotivoExclusaoCanal | None]:
-    """Canal elegível: país BR informado na API e pelo menos 20 Shorts alvo elegíveis.
+    """Canal elegível: país BR informado na API (ou ausente, só em CANAIS_EXCECAO_PAIS) e pelo menos 20 Shorts
+    alvo elegíveis.
 
     Amostra parcial ou falha na leitura dos uploads não permitem concluir que faltam Shorts.
     """
@@ -458,9 +477,9 @@ def avaliar_canais(resultado: ResultadoColeta) -> dict[str, MotivoExclusaoCanal 
     parciais = set(resultado.canais_parciais)
     situacao: dict[str, MotivoExclusaoCanal | None] = {}
     for canal in resultado.canais:
-        if canal.pais is None:
+        if canal.pais is None and not pais_aceito_por_excecao(canal):
             situacao[canal.channel_id] = MotivoExclusaoCanal.PAIS_NAO_INFORMADO
-        elif canal.pais != PAIS_EXIGIDO:
+        elif canal.pais is not None and canal.pais != PAIS_EXIGIDO:
             situacao[canal.channel_id] = MotivoExclusaoCanal.PAIS_DIFERENTE
         elif canal.channel_id in resultado.falhas_por_canal:
             situacao[canal.channel_id] = MotivoExclusaoCanal.FALHA_NA_COLETA

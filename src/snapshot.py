@@ -127,6 +127,22 @@ def _situacao_dos_canais(resultado: coleta.ResultadoColeta) -> list[dict]:
     return linhas
 
 
+def _excecao_pais_aplicada(resultado: coleta.ResultadoColeta, linhas: list[dict], lista: ListaCanais) -> list[dict]:
+    """Canais cujo país ausente na API foi aceito pela exceção: país observado, situação final e evidência da lista."""
+    situacao = {linha["channel_id"]: linha["situacao"] for linha in linhas}
+    evidencia = {canal.channel_id: canal.evidencia for canal in lista.canais}
+    return [
+        {
+            "channel_id": canal.channel_id,
+            "pais_api": canal.pais,
+            "situacao": situacao[canal.channel_id],
+            "evidencia": evidencia.get(canal.channel_id),
+        }
+        for canal in resultado.canais
+        if coleta.pais_aceito_por_excecao(canal)
+    ]
+
+
 def proveniencia(
     resultado: coleta.ResultadoColeta,
     *,
@@ -140,6 +156,7 @@ def proveniencia(
     vídeo não pôde ser lido. `completo`: nenhum dos dois.
     """
     janela = coleta.Janela(resultado.coletado_em)
+    canais = _situacao_dos_canais(resultado)
     status_da_lista = {canal.channel_id: str(canal.status) for canal in lista.canais}
     parcial = bool(resultado.canais_parciais)
     com_falhas = bool(
@@ -174,6 +191,7 @@ def proveniencia(
             "tolerancia_quadrado": coleta.TOLERANCIA_QUADRADO,
             "minimo_shorts_por_canal": coleta.MINIMO_SHORTS_POR_CANAL,
             "pais_exigido": coleta.PAIS_EXIGIDO,
+            "canais_excecao_pais": sorted(coleta.CANAIS_EXCECAO_PAIS),
             "max_paginas_por_canal": resultado.max_paginas_por_canal,
             "limite_unidades": resultado.limite_unidades,
         },
@@ -193,7 +211,8 @@ def proveniencia(
         "codigo": estado_do_codigo(),
         "cota": {"unidades_consumidas": resultado.unidades_cota, "custo_por_chamada": CUSTO_POR_CHAMADA},
         "contagens": resultado.resumo(),
-        "canais": _situacao_dos_canais(resultado),
+        "canais": canais,
+        "excecao_pais_aplicada": _excecao_pais_aplicada(resultado, canais, lista),
         "falhas": {
             "canais_nao_encontrados": list(resultado.canais_nao_encontrados),
             "falhas_por_canal": dict(resultado.falhas_por_canal),
