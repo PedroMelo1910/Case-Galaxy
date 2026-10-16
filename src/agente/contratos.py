@@ -114,6 +114,16 @@ class PostFornecido(_Modelo):
         return self
 
 
+class PostConsultado(PostFornecido):
+    """Uso interno: post devolvido por um consultor do YouTube, com o id real do vídeo.
+
+    Não faz parte do pedido público (`channel_stats` segue aceitando só `PostFornecido`). O id permite excluir o
+    próprio vídeo do histórico, da referência e da cadência antes dos cálculos, qualquer que seja a data planejada.
+    """
+
+    video_id: str | None = None
+
+
 class PedidoPrever(_Modelo):
     creative: Criativo
     caption: Legenda | None = None

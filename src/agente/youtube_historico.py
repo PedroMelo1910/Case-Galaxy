@@ -13,7 +13,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
 from src import youtube_api as yt
-from src.agente.contratos import Codigo, ErroAgente, PostFornecido
+from src.agente.contratos import Codigo, ErroAgente, PostConsultado, PostFornecido
 from src.coleta import duracao_em_segundos
 from src.contratos import DURACAO_MAXIMA_SHORT_S
 from src.historico import MAX_POSTS
@@ -66,7 +66,7 @@ def criar_consultor(cliente: yt.ClienteYouTube, *, max_paginas: int = MAX_PAGINA
                 continue
             curtidas = r.get("statistics", {}).get("likeCount")
             likes = int(curtidas) if curtidas is not None and publicado <= limite else None
-            posts.append(PostFornecido(published_at=publicado, likes=likes, collected_at=coletado))
+            posts.append(PostConsultado(video_id=r.get("id"), published_at=publicado, likes=likes, collected_at=coletado))
         return posts
 
     return consultar

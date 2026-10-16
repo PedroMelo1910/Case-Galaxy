@@ -31,6 +31,16 @@ DEFINICAO_REFERENCIA = ("mediana das curtidas dos últimos 20 posts elegíveis d
                         "da data planejada")
 
 
+TEMPO_MATERIAL_PUBLICADO = ("A data planejada já passou: o material já foi publicado. Esta saída é uma demonstração "
+                            "operacional com material existente, não é previsão feita antes da publicação.")
+TEMPO_MATERIAL_FUTURO = "A data planejada ainda não ocorreu: previsão anterior à publicação."
+
+
+def material_ja_publicado(s: Servicos, p: PedidoPrever) -> bool:
+    """A data planejada já ocorreu segundo o relógio do serviço; não depende da data do snapshot do histórico."""
+    return p.planned_datetime <= s.relogio()
+
+
 class Estado(TypedDict, total=False):
     pedido: PedidoPrever
     erro: ErroAgente
@@ -128,6 +138,8 @@ def avaliar_confianca(s: Servicos, e: Estado) -> dict:
     avisos.append(_aviso("faixa_sem_cobertura_suficiente", s.pacote.declaracao_faixa["aviso"]))
     avisos.append(_aviso("sem_sinal_de_confianca_da_lim", "Não há limiar estatístico de confiança medido na amostra "
                                                            "LIM; nenhum sinal de confiança é afirmado.", "info"))
+    if material_ja_publicado(s, e["pedido"]):
+        avisos.append(_aviso("material_ja_publicado", TEMPO_MATERIAL_PUBLICADO))
     if pred["cortada_em_zero"]:
         avisos.append(_aviso("previsao_cortada_em_zero", "A saída bruta do modelo ficou abaixo de zero e foi cortada "
                                                           "em 0 curtidas."))
@@ -155,7 +167,8 @@ def montar_saida(s: Servicos, e: Estado) -> dict:
         "relative_to_channel": pred["relative_to_channel"], "reference_likes": pred["curtidas_referencia"],
         "reference_source": "canal" if h.linha["estado_referencia"] == "canal" else "setor",
         "reference_definition": DEFINICAO_REFERENCIA, "target_definition": ALVO,
-        "history": h.resumo(), "retrospective": p.planned_datetime <= s.base.coletado_em,
+        "history": h.resumo(), "retrospective": material_ja_publicado(s, p),
+        "prediction_timing": TEMPO_MATERIAL_PUBLICADO if material_ja_publicado(s, p) else TEMPO_MATERIAL_FUTURO,
         "warnings": e["avisos"], "top_drivers": evidencia["drivers"], "family_contributions": evidencia["familias"],
         "explanation": expl["texto"], "explanation_source": expl["fonte"],
         "explanation_fallback_reason": expl["motivo_fallback"], "comparables": e["comparaveis"],

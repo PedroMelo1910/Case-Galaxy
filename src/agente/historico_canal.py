@@ -70,9 +70,18 @@ def _aviso(codigo: str, descricao: str, classe: str = "atencao") -> dict:
     return {"classe": classe, "codigo": codigo, "descricao": descricao}
 
 
-def _posts_externos(estatisticas: Sequence[PostFornecido], channel_id: str) -> list[hist.Post]:
-    return [hist.Post(video_id=f"externo:{i}", channel_id=channel_id, published_at=p.published_at,
-                      curtidas=p.likes, papel="so_historico") for i, p in enumerate(estatisticas)]
+def _posts_externos(estatisticas: Sequence[PostFornecido], channel_id: str,
+                    excluir_video_id: str | None = None) -> list[hist.Post]:
+    """Posts do histórico fornecido ou consultado. O vídeo-alvo, quando o consultor informa o id, sai antes dos
+    cálculos, qualquer que seja a data planejada; posts sem id (`channel_stats` do chamador) mantêm `externo:i`."""
+    posts = []
+    for i, p in enumerate(estatisticas):
+        id_real = getattr(p, "video_id", None)
+        if id_real is not None and id_real == excluir_video_id:
+            continue
+        posts.append(hist.Post(video_id=id_real or f"externo:{i}", channel_id=channel_id, published_at=p.published_at,
+                               curtidas=p.likes, papel="so_historico"))
+    return posts
 
 
 def _escolher_fonte(pedido: PedidoPrever, base: BaseHistorica, consultor: Consultor | None,
@@ -116,7 +125,7 @@ def obter_historico(pedido: PedidoPrever, base: BaseHistorica, *, consultor: Con
     origem, externos, data_ref = _escolher_fonte(pedido, base, consultor, registrado is not None, agora)
     posts = list(base.posts)
     if externos is not None:  # histórico fornecido ou consultado substitui o do snapshot para este canal
-        posts = [p for p in posts if p.channel_id != canal_id] + _posts_externos(externos, canal_id)
+        posts = [p for p in posts if p.channel_id != canal_id] + _posts_externos(externos, canal_id, _id_alvo(pedido))
     canais = dict(base.canais)
     canais[canal_id] = hist.Canal(channel_id=canal_id, setor=pedido.sector, tipo_canal=tipo)
     alvo = hist.Post(video_id=_id_alvo(pedido), channel_id=canal_id, published_at=pedido.planned_datetime,
