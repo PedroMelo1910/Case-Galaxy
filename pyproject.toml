@@ -9,6 +9,18 @@ dependencies = [
     "pyarrow>=26.0.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    # Extração local de legenda e capa (C6, C7): CPU, sem CUDA.
+    "easyocr",
+    "mediapipe",
+    "numpy",
+    "opencv-python-headless",
+    "pillow",
+    "torch",
+    "torchvision",
+    "transformers",
+    "scikit-learn>=1.9.1",
+    "lightgbm>=4.7.0",
+    "langgraph>=1.2.15",
 ]
 
 [build-system]
@@ -19,6 +31,16 @@ build-backend = "uv_build"
 # O cache do uv fica no disco Linux e o .venv em /mnt/c (sistemas de arquivos
 # diferentes): hardlink é impossível, então a cópia é declarada explicitamente.
 link-mode = "copy"
+
+# Torch e torchvision só da distribuição para CPU (sem bibliotecas CUDA de vários GB).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [tool.uv.build-backend]
 module-name = "src"
