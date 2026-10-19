@@ -23,13 +23,14 @@ from src.agente.contratos import (
     ErroAgente,
     PedidoPrever,
     PostFornecido,
-    video_id_da_url,
+    id_do_proprio_video,
 )
 
 ID_ALVO_PLANEJADO = "__planejado__"
 
-Consultor = Callable[[str, datetime], Sequence[PostFornecido]]
-"""`(channel_id, publicados_ate)`: posts até o limite com curtidas e posts recentes só para a cadência."""
+Consultor = Callable[..., Sequence[PostFornecido]]
+"""`(channel_id, publicados_ate)`: posts até o limite com curtidas e posts recentes só para a cadência. Se o atributo
+`aceita_exclusao_do_alvo` for verdadeiro, recebe também `excluir_video_id=`: o vídeo-alvo não entra na leitura."""
 
 
 @dataclass(frozen=True)
@@ -72,8 +73,8 @@ def _aviso(codigo: str, descricao: str, classe: str = "atencao") -> dict:
 
 def _posts_externos(estatisticas: Sequence[PostFornecido], channel_id: str,
                     excluir_video_id: str | None = None) -> list[hist.Post]:
-    """Posts do histórico fornecido ou consultado. O vídeo-alvo, quando o consultor informa o id, sai antes dos
-    cálculos, qualquer que seja a data planejada; posts sem id (`channel_stats` do chamador) mantêm `externo:i`."""
+    """Posts do histórico fornecido ou consultado. O próprio criativo (id da URL ou `own_video_id`) sai antes dos
+    cálculos, qualquer que seja a data planejada; posts sem id mantêm `externo:i` e só a data os protege."""
     posts = []
     for i, p in enumerate(estatisticas):
         id_real = getattr(p, "video_id", None)
@@ -84,17 +85,30 @@ def _posts_externos(estatisticas: Sequence[PostFornecido], channel_id: str,
     return posts
 
 
+def _recusar_ids_de_outros_canais(externos: Sequence[hist.Post], restantes: Sequence[hist.Post]) -> None:
+    """Um `video_id` fornecido que já pertence a outro canal da base é entrada inválida, não erro interno."""
+    existentes = {p.video_id for p in restantes}
+    colisoes = sorted(p.video_id for p in externos if p.video_id in existentes)
+    if colisoes:
+        raise ErroAgente(Codigo.ENTRADA_INVALIDA,
+                         "`video_id` do histórico fornecido pertence a outro canal da base.",
+                         {"campo": "channel_stats.video_id", "ids": colisoes[:5]})
+
+
 def _escolher_fonte(pedido: PedidoPrever, base: BaseHistorica, consultor: Consultor | None,
                     canal_conhecido: bool, agora: datetime) -> tuple[str, list[PostFornecido] | None, datetime]:
     if pedido.channel_stats:  # lista vazia não apaga o histórico do snapshot
         coletas = [p.collected_at for p in pedido.channel_stats]
         return ORIGEM_FORNECIDO, list(pedido.channel_stats), max(coletas, default=agora)
     if pedido.consultar_youtube:
-        if consultor is None or pedido.channel_id is None:
+        if pedido.channel_id is None:
+            raise ErroAgente(Codigo.HISTORICO_INDISPONIVEL, "Consulta ao YouTube pedida sem `channel_id`.")
+        if consultor is None:
             raise ErroAgente(Codigo.HISTORICO_INDISPONIVEL,
-                             "Consulta ao YouTube pedida, mas o adaptador ou o channel_id não está disponível.")
+                             "A consulta ao YouTube não está habilitada neste servidor (modo offline): envie "
+                             "`channel_stats` ou use um servidor com o modo online.", {"channel_id": pedido.channel_id})
         limite = pedido.planned_datetime - timedelta(days=hist.DEFASAGEM_PADRAO)
-        return ORIGEM_CONSULTA_ATUAL, list(consultor(pedido.channel_id, limite)), agora
+        return ORIGEM_CONSULTA_ATUAL, list(_consultar(consultor, pedido, limite)), agora
     if canal_conhecido:
         return ORIGEM_SNAPSHOT, None, base.coletado_em
     raise ErroAgente(
@@ -103,8 +117,19 @@ def _escolher_fonte(pedido: PedidoPrever, base: BaseHistorica, consultor: Consul
         "Não é um histórico curto: não há fonte de histórico.", {"channel_id": pedido.channel_id})
 
 
+def _consultar(consultor: Consultor, pedido: PedidoPrever, limite: datetime) -> Sequence[PostFornecido]:
+    """Consulta o canal; um consultor que sabe excluir o vídeo-alvo da leitura de estatísticas recebe o id dele.
+
+    O pedido ao YouTube nunca deve pedir as curtidas, visualizações ou comentários do vídeo consultado (ARQUITETURA §7).
+    """
+    alvo = id_do_proprio_video(pedido)
+    if alvo is not None and getattr(consultor, "aceita_exclusao_do_alvo", False):
+        return consultor(pedido.channel_id, limite, excluir_video_id=alvo)
+    return consultor(pedido.channel_id, limite)
+
+
 def _id_alvo(pedido: PedidoPrever) -> str:
-    return video_id_da_url(getattr(pedido.creative, "url", None)) or ID_ALVO_PLANEJADO
+    return id_do_proprio_video(pedido) or ID_ALVO_PLANEJADO
 
 
 def obter_historico(pedido: PedidoPrever, base: BaseHistorica, *, consultor: Consultor | None = None,
@@ -125,14 +150,43 @@ def obter_historico(pedido: PedidoPrever, base: BaseHistorica, *, consultor: Con
     origem, externos, data_ref = _escolher_fonte(pedido, base, consultor, registrado is not None, agora)
     posts = list(base.posts)
     if externos is not None:  # histórico fornecido ou consultado substitui o do snapshot para este canal
-        posts = [p for p in posts if p.channel_id != canal_id] + _posts_externos(externos, canal_id, _id_alvo(pedido))
+        restantes = [p for p in posts if p.channel_id != canal_id]
+        novos = _posts_externos(externos, canal_id, id_do_proprio_video(pedido))
+        _recusar_ids_de_outros_canais(novos, restantes)
+        posts = restantes + novos
     canais = dict(base.canais)
     canais[canal_id] = hist.Canal(channel_id=canal_id, setor=pedido.sector, tipo_canal=tipo)
     alvo = hist.Post(video_id=_id_alvo(pedido), channel_id=canal_id, published_at=pedido.planned_datetime,
                      curtidas=None, papel="alvo", duracao_s=pedido.duration_s)
     linha = hist.calcular(posts, canais, [alvo], base.contexto)[0]
     avisos.extend(_avisos_de_origem(origem, data_ref, pedido.planned_datetime, linha))
+    avisos.extend(_avisos_de_identidade(pedido, origem, externos, data_ref))
     return ResultadoHistorico(linha, origem, data_ref, registrado is not None, tipo, tuple(avisos))
+
+
+def _avisos_de_identidade(pedido: PedidoPrever, origem: str, externos: Sequence[PostFornecido] | None,
+                          data_ref: datetime) -> list[dict]:
+    """Declara a limitação quando o agente não consegue garantir a exclusão do próprio criativo.
+
+    Só importa se o histórico foi lido depois da data planejada (demonstração retrospectiva): um criativo ainda não
+    publicado não pode estar nele. Sem identidade, ou com posts sem `video_id`, só a defasagem de 30 dias protege.
+    """
+    if pedido.planned_datetime > data_ref:
+        return []
+    if id_do_proprio_video(pedido) is None:
+        return [_aviso(
+            "identidade_do_proprio_video_ausente",
+            "Sem URL do YouTube nem `own_video_id`, o agente não sabe qual post do histórico é o próprio criativo: "
+            "se ele já foi publicado, só a defasagem de 30 dias o mantém fora da referência (e a cadência pode "
+            "contá-lo). Informe `own_video_id` e o `video_id` de cada post para excluí-lo antes dos cálculos.")]
+    sem_id = sum(1 for p in externos or () if getattr(p, "video_id", None) is None) \
+        if origem == ORIGEM_FORNECIDO else 0
+    if sem_id:
+        return [_aviso(
+            "historico_fornecido_sem_ids",
+            f"{sem_id} post{'s' if sem_id != 1 else ''} do histórico fornecido sem `video_id`: não é possível "
+            "garantir que o próprio criativo esteja fora; para esses posts só a defasagem de 30 dias protege.")]
+    return []
 
 
 def _avisos_de_origem(origem: str, data_ref: datetime, planejada: datetime, linha: dict) -> list[dict]:

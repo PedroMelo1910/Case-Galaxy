@@ -4,6 +4,7 @@ Percorre os uploads do mais novo para o mais antigo (`playlistItems.list`, 50 po
 publicações com data até o limite (p − 30 dias) ou esgotar `max_paginas`; depois lê as estatísticas dos IDs reunidos
 (`videos.list`, 50 por chamada). Custo máximo: 1 + max_paginas + ceil(50 · max_paginas / 50) unidades.
 
+O vídeo-alvo (quando o id é conhecido) é retirado da lista ANTES de `videos.list`: nenhuma estatística dele é pedida.
 Só entram vídeos públicos de até 180 s. As publicações até o limite levam curtidas; as mais recentes entram com
 `likes = None` e servem só à cadência. Inscritos, visualizações e comentários não são usados. Se o limite de páginas
 cortar a busca antes de 20 posts elegíveis, o histórico fica curto e isso aparece nos avisos do fluxo.
@@ -27,7 +28,7 @@ def _instante(texto: str) -> datetime:
 
 def criar_consultor(cliente: yt.ClienteYouTube, *, max_paginas: int = MAX_PAGINAS_PADRAO,
                     agora: Callable[[], datetime] = lambda: datetime.now(UTC)
-                    ) -> Callable[[str, datetime], Sequence[PostFornecido]]:
+                    ) -> Callable[..., Sequence[PostFornecido]]:
     def listar_ids(uploads: str, limite: datetime) -> list[str]:
         ids, elegiveis, token = [], 0, None
         for _ in range(max_paginas):
@@ -41,16 +42,21 @@ def criar_consultor(cliente: yt.ClienteYouTube, *, max_paginas: int = MAX_PAGINA
                 break
         return ids
 
-    def consultar(channel_id: str, limite: datetime) -> list[PostFornecido]:
+    def consultar(channel_id: str, limite: datetime, excluir_video_id: str | None = None) -> list[PostFornecido]:
         try:
             canais = cliente.canais([channel_id])
             if not canais:
                 raise ErroAgente(Codigo.HISTORICO_INDISPONIVEL, "Canal não encontrado no YouTube.",
                                  {"channel_id": channel_id})
-            ids = listar_ids(canais[0]["contentDetails"]["relatedPlaylists"]["uploads"], limite)
+            ids = [i for i in listar_ids(canais[0]["contentDetails"]["relatedPlaylists"]["uploads"], limite)
+                   if i != excluir_video_id]
             recursos = cliente.videos(ids) if ids else []
         except yt.CotaEsgotada as erro:
-            raise ErroAgente(Codigo.COTA_ESGOTADA, "Cota da YouTube Data API esgotada.") from erro
+            raise ErroAgente(Codigo.COTA_ESGOTADA, "Cota da YouTube Data API esgotada.",
+                             {"origem": "youtube_data_api"}) from erro
+        except yt.LimiteDeUnidades as erro:
+            raise ErroAgente(Codigo.COTA_ESGOTADA, "O teto de unidades da YouTube Data API desta execução foi atingido.",
+                             {"origem": "limite_da_execucao"}) from erro
         except (yt.ErroYouTube, KeyError) as erro:
             raise ErroAgente(Codigo.HISTORICO_INDISPONIVEL, "Falha ao consultar o histórico no YouTube.",
                              {"tipo": type(erro).__name__}) from erro
@@ -69,4 +75,5 @@ def criar_consultor(cliente: yt.ClienteYouTube, *, max_paginas: int = MAX_PAGINA
             posts.append(PostConsultado(video_id=r.get("id"), published_at=publicado, likes=likes, collected_at=coletado))
         return posts
 
+    consultar.aceita_exclusao_do_alvo = True
     return consultar

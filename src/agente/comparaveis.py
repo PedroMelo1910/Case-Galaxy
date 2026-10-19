@@ -1,4 +1,4 @@
-"""Comparáveis reais do conjunto de desenvolvimento (treino e validação), nunca de teste final nem da LIM.
+"""Comparáveis reais da coleção de referência ativa (no refit final, o dataset final sem a LIM), nunca da LIM.
 
 Regras: exclui o próprio criativo; só vídeos publicados até `planned_datetime − 30 dias` (idade mínima de maturidade
 na data da consulta); mesmo setor; até 3 do mesmo canal e o restante (até 5 no total) de outros canais do setor.
@@ -36,12 +36,12 @@ def similaridade(consulta: Mapping, candidato: Mapping) -> float | None:
     return float(np.mean(valores)) if valores else None
 
 
-def _item(linha: Mapping, sim: float | None, mesmo_canal: bool) -> dict:
+def _item(linha: Mapping, sim: float | None, mesmo_canal: bool, origem: str) -> dict:
     return {
         "video_id": linha["video_id"], "url": url_do_video(linha["video_id"]),
         "channel_id": linha["channel_id"], "published_at": linha["published_at"].isoformat(),
         "curtidas": round(math.expm1(linha["y_log"])), "similaridade": sim, "mesmo_canal": mesmo_canal,
-        "origem": "desenvolvimento_real", "uso_no_contexto": linha["uso_no_contexto"],
+        "origem": origem, "uso_no_contexto": linha["uso_no_contexto"],
     }
 
 
@@ -51,8 +51,8 @@ def _ordenar(par: tuple[Mapping, float | None]) -> tuple:
 
 
 def selecionar(linhas: Sequence[Mapping], consulta: Mapping, *, channel_id: str | None, setor: str,
-               planejada: datetime, excluir_video_id: str | None) -> list[dict]:
-    """Até 5 comparáveis reais; `consulta` leva `leg_emb` e `capa_emb` do criativo (podem faltar)."""
+               planejada: datetime, excluir_video_id: str | None, origem: str = "desenvolvimento_real") -> list[dict]:
+    """Até 5 comparáveis reais da coleção de referência dada (nunca a LIM); `consulta` leva `leg_emb` e `capa_emb`."""
     limite = planejada - timedelta(days=DIAS_MATURIDADE)
     elegiveis = [
         l for l in linhas
@@ -64,4 +64,4 @@ def selecionar(linhas: Sequence[Mapping], consulta: Mapping, *, channel_id: str 
     outros = sorted((p for p in pontuadas if not (channel_id and p[0]["channel_id"] == channel_id)), key=_ordenar)
     escolhidos = [(*p, True) for p in do_canal[:N_DO_CANAL]]
     escolhidos += [(*p, False) for p in outros[:N_TOTAL - len(escolhidos)]]
-    return [_item(l, s, m) for l, s, m in escolhidos]
+    return [_item(l, s, m, origem) for l, s, m in escolhidos]

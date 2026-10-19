@@ -129,18 +129,34 @@ class ExecucaoInterrompida(RuntimeError):
         self.tentativas = tentativas
 
 
+def parte_de_video(uri: str, mime: str, config: ConfiguracaoExtracao) -> dict:
+    """Parte `fileData` do pedido: URL pública ou URI da Files API, com o mesmo `mediaProcessing` da configuração."""
+    return {"fileData": {"fileUri": uri, "mimeType": mime}, "mediaProcessing": config.processamento_midia}
+
+
+def corpo_com_video(parte_video: dict, setor: Setor, config: ConfiguracaoExtracao) -> dict:
+    """Pedido único para as duas rotas (URL e arquivo enviado): só muda a parte do vídeo, nunca rubrica, esquema,
+    temperatura nem limite de saída, para que as anotações das duas rotas sejam comparáveis (verificação V24)."""
+    return {
+        "contents": [{"role": "user", "parts": [parte_video, {"text": rb.texto_do_pedido(setor)}]}],
+        "generationConfig": config.parametros_geracao() | {"responseJsonSchema": rb.esquema_json(setor)},
+    }
+
+
+def corpo_para_url(url: str, setor: Setor, config: ConfiguracaoExtracao) -> dict:
+    return corpo_com_video(parte_de_video(url, config.tipo_midia, config), setor, config)
+
+
+def corpo_para_arquivo(uri: str, mime: str, setor: Setor, config: ConfiguracaoExtracao) -> dict:
+    """Pedido de um vídeo enviado à Files API: o tipo MIME é o do arquivo real, o resto é igual ao da rota por URL."""
+    return corpo_com_video(parte_de_video(uri, mime, config), setor, config)
+
+
 def corpo_da_requisicao(item: ItemExtracao, config: ConfiguracaoExtracao) -> dict:
     """Pedido do generateContent: vídeo pela URL, seguido do texto; sem ferramentas nem metadados do vídeo."""
     if not isinstance(item, ItemExtracao):
         raise TypeError("o pedido ao Gemini só aceita ItemExtracao (contrato sem estatísticas de desempenho)")
-    parte_video = {
-        "fileData": {"fileUri": item.url_video, "mimeType": config.tipo_midia},
-        "mediaProcessing": config.processamento_midia,
-    }
-    return {
-        "contents": [{"role": "user", "parts": [parte_video, {"text": rb.texto_do_pedido(item.setor)}]}],
-        "generationConfig": config.parametros_geracao() | {"responseJsonSchema": rb.esquema_json(item.setor)},
-    }
+    return corpo_para_url(item.url_video, item.setor, config)
 
 
 def _espera(erro: ga.ErroGemini, ordem: int, politica: Politica) -> float:

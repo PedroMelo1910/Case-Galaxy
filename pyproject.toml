@@ -21,7 +21,14 @@ dependencies = [
     "scikit-learn>=1.9.1",
     "lightgbm>=4.7.0",
     "langgraph>=1.2.15",
+    "mcp>=2.3,<3",
 ]
+
+# Pontos de entrada para quem só quer testar o software (sem reconstruir o dataset de treino).
+[project.scripts]
+casegalaxy-mcp = "src.agente.servidor_mcp:main"
+casegalaxy-demo = "src.demonstracao:main"
+casegalaxy-pacote-servido = "src.agente.manifesto_servido:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13"]

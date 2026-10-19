@@ -19,11 +19,17 @@ import numpy as np
 
 from src import dataset_desenvolvimento as ds
 from src import extracao_capa as capa
+from src import extracao_gemini as eg
 from src import extracao_legenda as leg
 from src import gemini_api as ga
 from src import rubrica as rb
-from src.agente.contratos import Codigo, ErroAgente, PedidoPrever, video_id_da_url  # noqa: F401
-from src.cache_gemini import CacheAnotacoes, CacheCorrompido, CacheIncompativel, gravar_json_atomico
+from src.agente.contratos import Codigo, ErroAgente, PedidoPrever, video_id_da_url
+from src.cache_gemini import (
+    CacheAnotacoes,
+    CacheCorrompido,
+    CacheIncompativel,
+    gravar_json_atomico,
+)
 from src.contratos import Setor
 
 ETAPAS_CAPA = ("cor", "rosto", "ocr", "clip")
@@ -221,20 +227,15 @@ class FonteAnotacaoGemini:
         return self._ao_vivo(url, setor, duracao_s)
 
     def _ao_vivo(self, url: str, setor: Setor, duracao_s: int | None) -> tuple[dict | None, str]:
-        corpo = {
-            "contents": [{"role": "user", "parts": [
-                {"fileData": {"fileUri": url, "mimeType": "video/mp4"}, "mediaProcessing": "STATIC"},
-                {"text": rb.texto_do_pedido(setor)}]}],
-            "generationConfig": {"responseMimeType": "application/json", "temperature": self.temperatura,
-                                 "maxOutputTokens": self.max_tokens_saida,
-                                 "responseJsonSchema": rb.esquema_json(setor)},
-        }
+        config = eg.ConfiguracaoExtracao(modelo=getattr(self.cliente, "modelo", ""), temperatura=self.temperatura,
+                                         max_tokens_saida=self.max_tokens_saida)
+        corpo = eg.corpo_para_url(url, setor, config)  # o mesmo pedido da anotação em lote
         try:
             with self._trava:
                 self.requisicoes_reais += 1
             resposta = self.cliente.gerar(corpo, duracao_video_s=duracao_s or MAX_DURACAO_PADRAO_S)
         except ga.CotaDiariaEsgotada:
-            return None, "falha_cota_esgotada"  # a previsão segue, com os atributos do Gemini ausentes e avisados
+            return None, "falha_cota_esgotada"  # o grafo segue pelo fallback para N3, avisado
         except ga.ErroGemini as erro:
             return None, f"falha_{type(erro).__name__}"
         if resposta.situacao != "ok" or resposta.texto is None:
@@ -252,7 +253,7 @@ def colunas_gemini(anotacao: Mapping | None, setor: str, codificador: leg.Codifi
         return {c: None for c in (*ds.COLUNAS_GEMINI, ds.COLUNA_EMBEDDING_TRANSCRICAO)} | {
             ds.COLUNA_ESTADO_EMBEDDING: "sem_anotacao"}
     linha = ds.linha_gemini(anotacao, setor)
-    texto = leg.normalizar_texto(anotacao.get("transcricao_texto"))
+    texto = ds.texto_para_embedding(anotacao)  # só a fala reconhecida; incerta, sem fala e falha não são codificadas
     if linha[ds.COLUNA_ESTADO_EMBEDDING] is None and texto:
         emb = ds.embeddings_transcricao({video_id: texto}, codificador, pasta_cache)[video_id]
         linha[ds.COLUNA_EMBEDDING_TRANSCRICAO] = emb["vetor"]

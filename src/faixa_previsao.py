@@ -119,6 +119,14 @@ def _sha(arquivo: Path) -> str:
     return hashlib.sha256(arquivo.read_bytes()).hexdigest()
 
 
+def treinar_companheiros(treino: Sequence[Mapping], q50: md.ModeloTreinado) -> dict[str, md.ModeloTreinado]:
+    """q10 e q90 com a população, os atributos, a representação das categorias e os parâmetros do q50; só o `alpha`
+    muda."""
+    return {nome: md.treinar(treino, q50.especificacao, parametros=q50.parametros | {"alpha": alfa},
+                             categoricas_nativas=q50.categoricas_nativas)
+            for nome, alfa in (("q10", ALFA_INFERIOR), ("q90", ALFA_SUPERIOR))}
+
+
 def executar(pasta_dataset: Path, artefato_q50: Path, saida_raiz: Path) -> dict:
     """Treina q10 e q90 com a configuração do q50, grava os três vínculos e mede a faixa na validação."""
     from src import dataset_desenvolvimento as ds
@@ -127,15 +135,13 @@ def executar(pasta_dataset: Path, artefato_q50: Path, saida_raiz: Path) -> dict:
     treino = [l for l in linhas if l["uso_no_contexto"] == md.USO_TREINO]
     validacao = [l for l in linhas if l["uso_no_contexto"] == md.USO_AVALIACAO]
     q50 = md.carregar(artefato_q50)
-    espec = q50.especificacao
     destino = Path(saida_raiz) / "faixa=v1" / f"{manifesto['sha256_dataset'][:12]}-{Path(artefato_q50).name}"
     if destino.exists():
         raise FileExistsError(f"já existe e não será sobrescrito: {destino}")
-    modelos = {"q50": q50}
+    modelos = {"q50": q50} | treinar_companheiros(treino, q50)
     for nome, alfa in (("q10", ALFA_INFERIOR), ("q90", ALFA_SUPERIOR)):
-        modelos[nome] = md.treinar(treino, espec, parametros=q50.parametros | {"alpha": alfa})
         md.salvar(modelos[nome], destino / nome, metadados={
-            "tipo": f"modelo_provisorio_{nome}", "alfa": alfa, "dataset_sha256": manifesto["sha256_dataset"],
+            "tipo": f"modelo_provisorio_{nome}", "status": "provisorio", "alfa": alfa, "dataset_sha256": manifesto["sha256_dataset"],
             "q50_artefato": str(artefato_q50), "q50_sha256_modelo": _sha(Path(artefato_q50) / md.ARQUIVO_MODELO),
             "regra": "mesma população, atributos, pré-processamento e configuração do q50; só o objetivo muda"})
     recarregados = {n: (q50 if n == "q50" else md.carregar(destino / n)) for n in ("q10", "q50", "q90")}
@@ -160,7 +166,8 @@ def executar(pasta_dataset: Path, artefato_q50: Path, saida_raiz: Path) -> dict:
                            "n_linhas_cortadas_em_zero": int(exp["cortada_em_zero"].sum()),
                            "soma_confere_com_o_modelo": True,
                            "maiores_contribuicoes_medias_abs": {exp["nomes"][i]: float(media_abs[i]) for i in ordem}},
-        "limitacoes": ["provisório; 107 linhas de validação; sem teste final", "cobertura é observada, não garantida",
+        "limitacoes": [f"provisório; {len(validacao)} linhas de validação; sem teste final",
+                       "cobertura é observada, não garantida",
                        "TreeSHAP em atributos correlacionados divide contribuição; não é causal"],
     }
     (destino / "resultado.json").write_text(json.dumps(resultado, ensure_ascii=False, indent=1), encoding="utf-8")

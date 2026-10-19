@@ -16,6 +16,7 @@ MIN_CRIATIVOS_ORDENAR = 2
 
 
 _ID_VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
+PADRAO_ID_VIDEO = r"^[A-Za-z0-9_-]{11}$"  # mesmo formato, para o esquema público (JSON Schema)
 _HOSTS_YOUTUBE = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}
 
 
@@ -35,13 +36,15 @@ def video_id_da_url(url: str | None) -> str | None:
         else:
             m = re.match(r"^/(?:shorts|embed)/([^/?#]+)", partes.path)
             candidato = m.group(1) if m else None
-    return candidato if candidato and _ID_VIDEO.match(candidato) else None
+    return candidato if candidato and _ID_VIDEO.fullmatch(candidato) else None
 
 
 class Codigo(StrEnum):
     ENTRADA_INVALIDA = "ENTRADA_INVALIDA"
     MIDIA_INVALIDA = "MIDIA_INVALIDA"
     CANAIS_DIFERENTES = "CANAIS_DIFERENTES"
+    MODALIDADES_DIFERENTES = "MODALIDADES_DIFERENTES"
+    NIVEIS_DIFERENTES = "NIVEIS_DIFERENTES"
     HISTORICO_INDISPONIVEL = "HISTORICO_INDISPONIVEL"
     MODELO_INDISPONIVEL = "MODELO_INDISPONIVEL"
     COTA_ESGOTADA = "COTA_ESGOTADA"
@@ -101,11 +104,19 @@ class PostFornecido(_Modelo):
     """Post anterior informado pelo chamador. `collected_at` diz quando as curtidas foram lidas.
 
     `likes` ausente (None) conta só para a cadência de publicação; não vira zero nem entra na referência.
+
+    `video_id` (opcional, ID de 11 caracteres do YouTube) identifica o post. Com ele o agente exclui o próprio criativo
+    do histórico, da referência e da cadência antes dos cálculos, qualquer que seja a data planejada (pareado com a
+    URL do vídeo ou com `own_video_id` do pedido). Sem ele, só a defasagem de 30 dias protege, e o agente avisa.
     """
 
     published_at: AwareDatetime
     likes: int | None = Field(default=None, ge=0)
     collected_at: AwareDatetime
+    video_id: str | None = Field(
+        default=None, pattern=PADRAO_ID_VIDEO,
+        description="ID de 11 caracteres do vídeo no YouTube (opcional). Permite excluir o próprio criativo do "
+                    "histórico quando ele aparece na lista.")
 
     @model_validator(mode="after")
     def _ordem(self) -> PostFornecido:
@@ -117,8 +128,8 @@ class PostFornecido(_Modelo):
 class PostConsultado(PostFornecido):
     """Uso interno: post devolvido por um consultor do YouTube, com o id real do vídeo.
 
-    Não faz parte do pedido público (`channel_stats` segue aceitando só `PostFornecido`). O id permite excluir o
-    próprio vídeo do histórico, da referência e da cadência antes dos cálculos, qualquer que seja a data planejada.
+    Mantido por compatibilidade: o id agora também existe (opcional) em `PostFornecido`. Aqui o formato não é
+    validado, pois os consultores e os dublês de teste podem usar ids curtos.
     """
 
     video_id: str | None = None
@@ -136,6 +147,11 @@ class PedidoPrever(_Modelo):
     channel_type: Literal["marca", "criador"] | None = None
     duration_s: int | None = Field(default=None, gt=0)
     consultar_youtube: bool = False
+    own_video_id: str | None = Field(
+        default=None, pattern=PADRAO_ID_VIDEO,
+        description="ID de 11 caracteres do YouTube do próprio criativo, quando ele já existe no canal (opcional). "
+                    "Vem da URL em vídeos com `url`; para imagem, texto e vídeo em arquivo, informe-o para que o "
+                    "agente exclua o criativo do histórico antes da referência e da cadência.")
 
     @model_validator(mode="after")
     def _canal(self) -> PedidoPrever:
@@ -143,9 +159,24 @@ class PedidoPrever(_Modelo):
             raise ValueError("informe `channel_id` ou `channel_stats`")
         return self
 
+    @model_validator(mode="after")
+    def _identidade(self) -> PedidoPrever:
+        da_url = video_id_da_url(getattr(self.creative, "url", None))
+        if self.own_video_id is not None and da_url is not None and da_url != self.own_video_id:
+            raise ValueError("`own_video_id` diverge do ID da `url` do vídeo")
+        ids = [p.video_id for p in self.channel_stats or () if p.video_id is not None]
+        if len(ids) != len(set(ids)):
+            raise ValueError("`channel_stats` repete um `video_id`")
+        return self
+
     @property
     def modalidade(self) -> str:
         return self.creative.tipo
+
+
+def id_do_proprio_video(pedido: PedidoPrever) -> str | None:
+    """ID do próprio criativo no YouTube: o da URL do vídeo ou `own_video_id`; None se o pedido não o identifica."""
+    return video_id_da_url(getattr(pedido.creative, "url", None)) or pedido.own_video_id
 
 
 class PedidoOrdenar(_Modelo):

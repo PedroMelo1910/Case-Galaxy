@@ -35,6 +35,9 @@ PARAMETROS_INICIAIS = {
 }
 
 
+CHAVES_DA_BUSCA = frozenset({"num_leaves", "min_child_samples", "reg_lambda"})  # grade aprovada: nada mais é sobrescrito
+
+
 class ErroModelo(ValueError):
     """Entrada, população ou artefato incompatível com o contrato do modelo."""
 
@@ -53,18 +56,29 @@ def reconstruir_log(linhas: Sequence[Mapping], previsao_relativa: np.ndarray) ->
 
 
 class ModeloTreinado:
-    def __init__(self, pipeline: Pipeline, especificacao: EspecificacaoAtributos, parametros: Mapping) -> None:
+    def __init__(self, pipeline: Pipeline, especificacao: EspecificacaoAtributos, parametros: Mapping,
+                 categoricas_nativas: bool = False) -> None:
         self.pipeline, self.especificacao, self.parametros = pipeline, especificacao, dict(parametros)
+        self.categoricas_nativas = categoricas_nativas  # False: categorias entram como códigos ordinais (padrão)
 
     @property
     def nomes_atributos(self) -> list[str]:
         return list(self.pipeline.named_steps["pre"].nomes_saida_)
 
-    def prever_relativo(self, linhas: Sequence[Mapping]) -> np.ndarray:
-        return self.pipeline.predict(list(linhas))
+    def prever_relativo(self, linhas: Sequence[Mapping], num_arvores: int | None = None) -> np.ndarray:
+        """Saída relativa; `num_arvores` lê só as primeiras árvores (None = todas, o comportamento de sempre).
 
-    def prever_log(self, linhas: Sequence[Mapping]) -> tuple[np.ndarray, int]:
-        return reconstruir_log(linhas, self.prever_relativo(linhas))
+        Fora de 1..árvores treinadas é recusado: o LightGBM leria todas as árvores em silêncio (0 ou negativo) ou
+        repetiria o modelo inteiro (acima do treinado), e o chamador acreditaria ter lido um prefixo."""
+        if num_arvores is None:
+            return self.pipeline.predict(list(linhas))
+        treinadas = self.pipeline.named_steps["modelo"].booster_.current_iteration()
+        if not 1 <= num_arvores <= treinadas:
+            raise ErroModelo(f"num_arvores deve estar entre 1 e {treinadas} (árvores treinadas); recebido {num_arvores}")
+        return self.pipeline.predict(list(linhas), num_iteration=num_arvores)
+
+    def prever_log(self, linhas: Sequence[Mapping], num_arvores: int | None = None) -> tuple[np.ndarray, int]:
+        return reconstruir_log(linhas, self.prever_relativo(linhas, num_arvores))
 
 
 def construir_pipeline(especificacao: EspecificacaoAtributos, parametros: Mapping) -> Pipeline:
@@ -84,11 +98,17 @@ def exigir_uso(linhas: Sequence[Mapping], uso: str) -> None:
 
 
 def treinar(linhas_treino: Sequence[Mapping], especificacao: EspecificacaoAtributos, *,
-            parametros: Mapping = PARAMETROS_INICIAIS) -> ModeloTreinado:
+            parametros: Mapping = PARAMETROS_INICIAIS, categoricas_nativas: bool = False) -> ModeloTreinado:
+    """`categoricas_nativas=True` declara ao LightGBM as colunas categóricas (as posições logo após os escalares na
+    matriz do pré-processador), para dividir por conjuntos de categorias em vez de por códigos ordinais."""
     exigir_uso(linhas_treino, USO_TREINO)
     pipeline = construir_pipeline(especificacao, parametros)
-    pipeline.fit(list(linhas_treino), np.array([l["y_rel"] for l in linhas_treino], dtype=np.float64))
-    return ModeloTreinado(pipeline, especificacao, parametros)
+    ajuste: dict = {}
+    if categoricas_nativas and especificacao.categoricas:
+        inicio = len(especificacao.escalares)
+        ajuste["modelo__categorical_feature"] = list(range(inicio, inicio + len(especificacao.categoricas)))
+    pipeline.fit(list(linhas_treino), np.array([l["y_rel"] for l in linhas_treino], dtype=np.float64), **ajuste)
+    return ModeloTreinado(pipeline, especificacao, parametros, categoricas_nativas=bool(ajuste))  # só se declarou
 
 
 def _curtidas(linhas: Sequence[Mapping]) -> list[int]:
@@ -150,15 +170,19 @@ def _gravar_artefato(modelo: ModeloTreinado, pasta: Path, metadados: Mapping) ->
     joblib.dump(modelo.pipeline, pasta / ARQUIVO_MODELO)
     conteudo = {
         "versao": VERSAO, "sha256_modelo": _sha256(pasta / ARQUIVO_MODELO), "parametros": modelo.parametros,
+        "categoricas_nativas": modelo.categoricas_nativas,
         "especificacao": {k: list(v) if not isinstance(v, Mapping) else dict(v)
                           for k, v in asdict(modelo.especificacao).items()},
         "atributos_de_saida": modelo.nomes_atributos,
         "dependencias": {"python": sys.version.split()[0], "lightgbm": lightgbm.__version__,
                          "scikit-learn": sklearn.__version__, "numpy": np.__version__,
                          "plataforma": platform.platform()},
-        **dict(metadados),
     }
-    (pasta / ARQUIVO_METADADOS).write_text(json.dumps(conteudo, ensure_ascii=False, indent=1), encoding="utf-8")
+    colisoes = sorted(set(conteudo) & set(metadados))
+    if colisoes:
+        raise ErroModelo(f"os metadados não podem sobrescrever campos do próprio artefato: {colisoes}")
+    (pasta / ARQUIVO_METADADOS).write_text(
+        json.dumps({**conteudo, **dict(metadados)}, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def _garantir(pasta: Path) -> Path:
@@ -184,13 +208,14 @@ def carregar(pasta: Path) -> ModeloTreinado:
     espec = meta["especificacao"]
     return ModeloTreinado(joblib.load(io.BytesIO(bytes_modelo)),
                           EspecificacaoAtributos(espec["escalares"], espec["categoricas"], espec["embeddings"]),
-                          meta["parametros"])
+                          meta["parametros"], categoricas_nativas=bool(meta.get("categoricas_nativas", False)))
 
 
 # --- execução completa: treino, avaliação, artefato e verificação de recarga --------------------------------------
 
 LIMITACOES = [
-    "Provisório: uma configuração fixa do LightGBM, não otimizada; a grade ainda não foi aprovada nem executada.",
+    "Provisório: configuração do LightGBM fixa; se há `busca`, ela veio de uma busca única feita em outra população "
+    "(ver `busca.n_treino_da_busca`) e não foi repetida para esta.",
     "A comparação com a média histórica é preliminar, em desenvolvimento, sem intervalo de confiança e sem o teste final.",
     "A população é só a anotada pelo Gemini e permitida ao desenvolvimento; não é amostra aleatória nova.",
     "Alvo observado nas curtidas acumuladas na coleta, não um valor exato aos 30 dias; avaliação retrospectiva.",
@@ -200,9 +225,13 @@ LIMITACOES = [
 def _parametros_da_busca(arquivo: Path, base: Mapping) -> tuple[dict, dict]:
     """Aplica sobre `base` só os parâmetros escolhidos pela busca; devolve também o registro de ligação."""
     bruto = Path(arquivo).read_bytes()
-    escolhidos = json.loads(bruto)["busca"]["escolhida"]["parametros"]
+    conteudo = json.loads(bruto)
+    escolhidos = conteudo["busca"]["escolhida"]["parametros"]
+    fora_da_grade = sorted(set(escolhidos) - CHAVES_DA_BUSCA)
+    if fora_da_grade:
+        raise ErroModelo(f"a busca só pode alterar {sorted(CHAVES_DA_BUSCA)}; recebido também {fora_da_grade}")
     ligacao = {"arquivo": Path(arquivo).name, "sha256": hashlib.sha256(bruto).hexdigest(),
-               "parametros_escolhidos": escolhidos}
+               "parametros_escolhidos": escolhidos, "n_treino_da_busca": conteudo.get("n_treino")}
     return dict(base) | escolhidos, ligacao
 
 
@@ -236,7 +265,8 @@ def executar(pasta_dataset: Path, saida_raiz: Path, *, parametros: Mapping = PAR
     relatorio = avaliar(modelo, validacao)
     ids = {"treino": [l["video_id"] for l in treino], "validacao": [l["video_id"] for l in validacao]}
     pasta = salvar(modelo, pasta_artefato, metadados={
-        "tipo": "modelo_provisorio_q50", "dataset": {"sha256": manifesto["sha256_dataset"],
+        "tipo": "modelo_provisorio_q50", "status": "provisorio",
+        "dataset": {"sha256": manifesto["sha256_dataset"], "versao": manifesto.get("versao"),
                                                      "pasta": str(Path(pasta_dataset)),
                                                      "entradas": manifesto["entradas"],
                                                      "reconciliacao": manifesto["reconciliacao_anotacoes"]},

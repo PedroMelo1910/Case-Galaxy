@@ -271,7 +271,7 @@ def explicar(evidencia: Mapping, subagente: Subagente | None) -> dict:
             motivo = f"erro_do_subagente: {type(erro).__name__}"
         except (ValueError, KeyError, TypeError) as erro:
             motivo = f"resposta_invalida: {type(erro).__name__}"
-        except Exception as erro:  # noqa: BLE001 - a explicação é opcional: a previsão já calculada é preservada
+        except Exception as erro:
             motivo = f"falha_do_subagente: {type(erro).__name__}"
     fixo = texto_modelo_fixo(evidencia)
     return {"texto": juntar_texto(fixo) + nota, "fonte": "template", "frases": fixo["frases"],

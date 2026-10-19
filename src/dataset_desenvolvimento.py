@@ -110,21 +110,38 @@ def _palavras(texto: str) -> int:
     return sum(any(c.isalnum() for c in parte) for parte in texto.split())
 
 
+STATUS_COM_FALA_RECONHECIDA = "ok"
+# Sem vetor e sem medidas de transcrição: cada motivo mantém o seu próprio estado (D-F5, ARQUITETURA §5.3).
+ESTADO_SEM_TRANSCRICAO_USAVEL = {"sem_fala": "sem_texto", "incerta": "transcricao_incerta",
+                                 "falha_extracao": "transcricao_falha"}
+
+
+def texto_para_embedding(anotacao: Mapping) -> str:
+    """Texto que pode virar vetor e medidas: só a fala reconhecida (`ok`). `sem_fala`, `incerta` e falha: vazio."""
+    if anotacao["transcricao_status"] != STATUS_COM_FALA_RECONHECIDA:
+        return ""
+    return leg.normalizar_texto(anotacao.get("transcricao_texto"))
+
+
 def linha_gemini(anotacao: Mapping, setor: str) -> dict:
-    """Colunas do Gemini de um vídeo. Desconhecido fica nulo (nunca 0); campo de outro setor fica nulo."""
+    """Colunas do Gemini de um vídeo. Desconhecido fica nulo (nunca 0); campo de outro setor fica nulo.
+
+    Transcrição `incerta` mantém o status e o texto (só como explicação/auditoria), mas medidas e embedding ficam
+    ausentes, como em `sem_fala` e em falha de extração; os três estados continuam distintos.
+    """
     linha: dict = {c: None for c in (*COLUNAS_GEMINI, COLUNA_EMBEDDING_TRANSCRICAO)}
     for campo in (*NOTAS, *SIM_NAO, *CATEGORICAS_GEMINI):
         linha[f"gem_{campo}"] = anotacao.get(campo)
     status = anotacao["transcricao_status"]
-    texto = leg.normalizar_texto(anotacao.get("transcricao_texto"))
+    texto = texto_para_embedding(anotacao)
     linha["gem_transc_status"] = status
-    if status != "sem_fala" and texto:
+    if texto:
         linha["gem_transc_n_caracteres"], linha["gem_transc_n_palavras"] = len(texto), _palavras(texto)
     for campo in TEXTO_LIVRE:
         valor = anotacao.get(campo)
         linha[f"exp_{campo}"] = json.dumps(valor, ensure_ascii=False) if isinstance(valor, (list, tuple)) else valor
     linha["setor_anotacao"] = setor
-    linha[COLUNA_ESTADO_EMBEDDING] = "sem_texto" if status == "sem_fala" or not texto else None
+    linha[COLUNA_ESTADO_EMBEDDING] = None if texto else ESTADO_SEM_TRANSCRICAO_USAVEL.get(status, "sem_texto")
     return linha
 
 
@@ -208,7 +225,11 @@ def juntar(ids: Sequence[str], *, n1: Mapping[str, Mapping], legenda: Mapping[st
 
 
 
-VERSAO = "1"
+VERSAO = "2"
+MUDANCAS_DA_VERSAO = {
+    "2": "transcrição `incerta` deixa de gerar medidas e embedding (preditores ausentes, como em D-F5); o status e o "
+         "texto (só explicação/auditoria) são mantidos e o estado de embedding passa a ser `transcricao_incerta`. "
+         "A versão 1 tratava `incerta` como texto utilizável (1 linha do treino)."}
 COMPONENTES_PCA = 8
 ARQUIVO_DATASET, ARQUIVO_MANIFESTO = "dataset.parquet", "manifesto.json"
 BLOCOS_EMBEDDING = {"leg_emb": leg.DIMENSAO_TEXTO, "capa_emb": 512, COLUNA_EMBEDDING_TRANSCRICAO: leg.DIMENSAO_TEXTO}
@@ -255,8 +276,10 @@ def _classificar(papeis: Mapping[str, str], tipos: Mapping[str, pa.DataType]) ->
 
 def montar(*, tabela_n1: Path, manifesto_n1: Path, pasta_legenda_capa: Path, arquivo_amostra: Path,
            carregar_anotacoes: Callable[[Sequence[str]], Mapping[str, Mapping]], codificador: leg.Codificador,
-           cache_embeddings: Path, destino_raiz: Path) -> Path:
-    """Monta e grava (sem sobrescrever) o dataset de desenvolvimento das linhas anotadas e permitidas."""
+           cache_embeddings: Path, destino_raiz: Path, nome_da_pasta: str | None = None) -> Path:
+    """Monta e grava (sem sobrescrever) o dataset de desenvolvimento das linhas anotadas e permitidas.
+
+    `nome_da_pasta` (padrão `desenvolvimento=v<versão>`) permite gravar o dataset do refit final em pasta própria."""
     amostra = json.loads(Path(arquivo_amostra).read_text(encoding="utf-8"))
     ordem = [x["video_id"] for x in amostra["lista"]]
     anotacoes = carregar_anotacoes(ordem)  # só as válidas e compatíveis: id → {"setor", "anotacao"}
@@ -269,18 +292,17 @@ def montar(*, tabela_n1: Path, manifesto_n1: Path, pasta_legenda_capa: Path, arq
     tab_capa = pq.read_table(Path(pasta_legenda_capa) / "capa.parquet")
     n1, legenda, capa = _por_id(tab_n1), _por_id(tab_leg), _por_id(tab_capa)
     transcricoes = embeddings_transcricao(
-        {v: ("" if anotacoes[v]["anotacao"]["transcricao_status"] == "sem_fala"
-             else anotacoes[v]["anotacao"].get("transcricao_texto", "")) for v in ids},
-        codificador, Path(cache_embeddings))
+        {v: texto_para_embedding(anotacoes[v]["anotacao"]) for v in ids}, codificador, Path(cache_embeddings))
     falhas = [v for v, r in transcricoes.items() if r["estado"] == "falha_extrator"]
     if falhas:
         raise ErroDataset(f"codificador falhou em {len(falhas)} transcrições; dataset não gravado")
     gemini = {}
     for v in ids:
         linha = linha_gemini(anotacoes[v]["anotacao"], anotacoes[v]["setor"])
-        emb = transcricoes[v]
-        linha[COLUNA_EMBEDDING_TRANSCRICAO] = emb["vetor"]
-        linha[COLUNA_ESTADO_EMBEDDING] = emb["estado"]
+        if linha[COLUNA_ESTADO_EMBEDDING] is None:  # só a fala reconhecida recebe vetor; os demais estados ficam
+            emb = transcricoes[v]
+            linha[COLUNA_EMBEDDING_TRANSCRICAO] = emb["vetor"]
+            linha[COLUNA_ESTADO_EMBEDDING] = emb["estado"]
         gemini[v] = linha
     linhas = juntar(ids, n1=n1, legenda=legenda, capa=capa, gemini=gemini)
 
@@ -295,7 +317,7 @@ def montar(*, tabela_n1: Path, manifesto_n1: Path, pasta_legenda_capa: Path, arq
     saida = pa.BufferOutputStream()
     pq.write_table(pa.Table.from_pylist([{c: l.get(c) for c in papeis} for l in linhas], schema=esquema), saida)
     dados = saida.getvalue().to_pybytes()
-    pasta = Path(destino_raiz) / f"desenvolvimento=v{VERSAO}" / _sha256_bytes(dados)[:12]
+    pasta = Path(destino_raiz) / (nome_da_pasta or f"desenvolvimento=v{VERSAO}") / _sha256_bytes(dados)[:12]
     if pasta.exists():
         return pasta  # mesmo conteúdo já gravado: idempotente, nada é sobrescrito
     manifesto = _manifesto(linhas, papeis, especificacao, reconciliacao, ids, dados, tabela_n1, manifesto_n1,
@@ -325,7 +347,7 @@ def _manifesto(linhas, papeis, especificacao, reconciliacao, ids, dados, tabela_
     por_papel = {p: [c for c, q in papeis.items() if q == p] for p in
                  ("identificacao", "alvo", "referencia", "atributo", "auditoria", "explicacao")}
     return {
-        "versao": VERSAO, "tipo": "dataset_desenvolvimento", "gerado_em_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "versao": VERSAO, "mudancas_da_versao": MUDANCAS_DA_VERSAO, "tipo": "dataset_desenvolvimento", "gerado_em_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sha256_dataset": _sha256_bytes(dados), "n_linhas": len(linhas),
         "entradas": {
             "base": man_n1["base"], "particao": man_n1["particao"], "contexto": man_n1["contexto"],

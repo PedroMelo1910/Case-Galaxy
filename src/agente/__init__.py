@@ -1,1 +1,1 @@
-"""Agente preditivo (sem MCP): `prever` e `ordenar` sobre o modelo de desenvolvimento q10/q50/q90."""
+"""Agente preditivo: `prever` e `ordenar` sobre o pacote ativo (manifesto) de modelos q10/q50/q90 por modalidade."""
