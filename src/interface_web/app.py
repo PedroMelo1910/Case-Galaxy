@@ -5,6 +5,7 @@ Nada é executado antes do clique explícito em "Analisar". O botão e os campos
 """
 
 import sys
+import hashlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import streamlit as st  # noqa: E402
 from src.agente.contratos import Codigo, ErroAgente, envelope_erro  # noqa: E402
 from src.interface_web import analise, formulario, analise as recursos, tema  # noqa: E402
 from src.interface_web.adaptador import ORIGEM_NOVA, ORIGEM_SALVA, Adaptador, modo_online_ligado  # noqa: E402
+from src.interface_web.adaptador import salvar_previsao  # noqa: E402
 from src.interface_web.estado import ControleEnvio  # noqa: E402
 from src.interface_web.validacao import EntradaFormulario, validar  # noqa: E402
 from src.interface_web.resultados import Turno, desenhar_turno  # noqa: E402
@@ -65,12 +67,22 @@ def _executar_nova(entrada: EntradaFormulario, video, canais: dict, adaptador: A
         sucesso = bool(resultado.envelope.get("success"))
         andamento.update(label="Análise concluída" if sucesso else "A análise não foi concluída",
                          state="complete" if sucesso else "error", expanded=False)
-    _adicionar(Turno(_resumo_da_entrada(entrada, canais), resultado.origem, resultado.envelope, resultado.do_cache))
+    nota = None
+    if sucesso:
+        try:
+            salvar_previsao(resultado.envelope, nome=entrada.arquivo_nome, setor=entrada.setor,
+                            contexto=" | ".join(_resumo_da_entrada(entrada, canais)),
+                            sha_video=hashlib.sha256(video.getvalue()).hexdigest())
+            nota = "Resultado salvo neste computador. Disponível em Reprodução de resposta salva."
+        except (OSError, ValueError, TypeError):
+            nota = "A previsão foi concluída, mas não foi possível salvá-la neste computador."
+    _adicionar(Turno(_resumo_da_entrada(entrada, canais), resultado.origem, resultado.envelope,
+                     resultado.do_cache, nota))
 
 
 def _executar_salva(item, adaptador) -> None:
-    resultado = analise.reproduzir(item.url, adaptador)
-    meta = adaptador.metadados()
+    resultado = analise.reproduzir(item.url, adaptador, video_id=item.video_id)
+    meta = item.gravacao or adaptador.metadados()
     nota = f"Resposta gravada em {meta.get('gerado_em_utc')} ({meta.get('rotulo')}). {meta.get('aviso') or ''}".strip()
     _adicionar(Turno((f"Reproduzir resposta salva: {item.canal_titulo} ({item.setor}), vídeo {item.video_id}",),
                      ORIGEM_SALVA, resultado.envelope, False, nota))
@@ -79,10 +91,11 @@ def _executar_salva(item, adaptador) -> None:
 def _escolher_salva(salvo, desabilitado: bool):
     itens = salvo.itens() if salvo else ()
     if not itens:
-        st.info("Não há respostas salvas instaladas neste computador.")
+        st.info("Ainda não há respostas salvas. Ao concluir uma nova previsão, ela será salva automaticamente neste computador.")
         return None
     return st.selectbox("Resposta salva", itens, index=None, key="f_salva", disabled=desabilitado,
-                        format_func=lambda i: f"{i.canal_titulo} · {i.setor} · {i.video_id}",
+                        format_func=lambda i: f"{i.canal_titulo} · {i.setor} · "
+                        f"{(i.gravacao or {}).get('gerado_em_utc') or i.video_id}",
                         placeholder="Escolha uma resposta gravada")
 
 

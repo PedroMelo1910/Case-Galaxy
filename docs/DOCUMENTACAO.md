@@ -318,6 +318,8 @@ O formulário atual aceita somente upload de um arquivo de vídeo e reúne setor
 
 O resultado resume em linguagem simples as curtidas previstas, a faixa estimada e a comparação com a referência do canal ou setor. Os fatores SHAP ficam em **Principais fatores**; rota, versão, origem do histórico e avisos ficam em **Detalhes técnicos**, ambos recolhidos inicialmente. A cobertura estatística permanece na API e nesta documentação, sem aparecer na interface. Durante uma execução o envio fica bloqueado. Uma resposta salva é identificada como resultado anterior e não prova que houve nova execução.
 
+As previsões bem-sucedidas da interface são salvas automaticamente em `data/privado/respostas_salvas/`, criada no primeiro salvamento e ignorada pelo Git. São guardados o resultado, a identificação do arquivo, o setor e a data de gravação; o vídeo e o CSV de entrada não são copiados para essa pasta. A opção **Reprodução de resposta salva** lista os resultados locais, inclusive depois de fechar e reabrir o aplicativo, e não executa novamente o modelo. Repetir o mesmo resultado não cria cópias. Esses arquivos são locais e podem ser removidos para apagar os resultados gravados. Resultados anteriores à ativação desse recurso não são recuperados automaticamente.
+
 Na rota Gemini, falha da anotação pode levar ao modelo de imagem quando há capa disponível. Essa resposta recebe a rota `video_gemini_fallback_imagem` e evidência limitada. A rota local não faz esse fallback: falha de extração ou ausência de modelo é erro explícito.
 
 O layout foi ajustado para desktop e largura móvel; não há validação em celular físico, Firefox, Safari ou leitor de tela. A interface apresenta apenas a análise do criativo, sem histórico de decisões do desenvolvimento.
