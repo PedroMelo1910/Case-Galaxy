@@ -164,7 +164,7 @@ O lançador prepara o Python 3.12 e o ambiente `.venv-windows` pelo lockfile. Se
 
 ### 2. Conferir os modelos incluídos
 
-O clone já contém os quatro pacotes em `data/execucao/modelos/` e o manifesto `data/execucao/manifesto.json`. Não existe download separado de dados/modelos. Os modelos são carregados com verificação de integridade. O histórico deve conter pelo menos cinco posts com curtidas, publicados pelo menos 30 dias antes da data planejada; inclua também posts recentes para calcular a cadência. Sem referência suficiente, o sistema recusa a previsão em vez de inventar um histórico setorial.
+O clone já contém os quatro pacotes em `data/execucao/modelos/` e o manifesto `data/execucao/manifesto.json`. Não existe download separado de dados/modelos. Os modelos são carregados com verificação de integridade. O `.gitattributes` preserva os bytes desses arquivos, evitando conversão LF/CRLF pelo Git no Windows; mantenha esse arquivo no repositório. O histórico deve conter pelo menos cinco posts com curtidas, publicados pelo menos 30 dias antes da data planejada; inclua também posts recentes para calcular a cadência. Sem referência suficiente, o sistema recusa a previsão em vez de inventar um histórico setorial.
 
 ### 3. Obter os pesos oficiais
 

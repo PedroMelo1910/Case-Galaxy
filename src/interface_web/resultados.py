@@ -77,6 +77,7 @@ class ModeloResposta:
     detalhe_cobertura: str | None = None
     alerta_rota: str | None = None
     extracao_resumo: str | None = None
+    mensagem_simples: str = ""
 
 
 def _comparacao(razao: float | None, fonte: str | None) -> str:
@@ -245,6 +246,34 @@ def _fonte_da_explicacao(d: dict) -> str:
     return f"Fonte não identificada ({exibivel(fonte)})." if fonte else "Fonte da explicação não informada."
 
 
+def _mensagem_simples(d: dict) -> str:
+    """Resumo de apresentação a partir dos números calculados, sem modificar a resposta da API."""
+    texto = f"Para este criativo, a estimativa é de **{inteiro(d['predicted_metric'])} curtidas**."
+    referencia, razao = d.get("reference_likes"), d.get("relative_to_channel")
+    if referencia is not None:
+        quem = "setor" if d.get("reference_source") == "setor" else "canal"
+        if isinstance(razao, (int, float)):
+            posicao = "próximo da" if abs(razao - 1) < 0.005 else "acima da" if razao > 1 else "abaixo da"
+            texto += f" Isso fica {posicao} referência do {quem}, de **{inteiro(referencia)} curtidas**."
+        else:
+            texto += f" A referência do {quem} é de **{inteiro(referencia)} curtidas**."
+    if d.get("interval_low") is not None and d.get("interval_high") is not None:
+        texto += f" A faixa estimada vai de **{inteiro(d['interval_low'])} a {inteiro(d['interval_high'])} curtidas**."
+    estado = _confianca(d).estado
+    if estado == "baixa":
+        texto += " Como a faixa é ampla, há bastante incerteza: use o resultado como uma referência, não como garantia."
+    elif estado == "indisponivel":
+        texto += " A confiança desta estimativa está indisponível; o resultado não é uma garantia."
+    else:
+        texto += " O resultado é uma estimativa e pode variar."
+    return texto
+
+
+def _sem_cobertura(texto: str) -> str:
+    """Cobertura estatística permanece na API e na documentação, fora da apresentação web."""
+    return ". ".join(p for p in texto.split(". ") if "cobertura" not in p.casefold()).strip()
+
+
 def construir_modelo(envelope: dict, origem: str) -> ModeloResposta | None:
     """Modelo de exibição de uma resposta de sucesso; `None` se o envelope não for de sucesso."""
     d = envelope.get("data") if isinstance(envelope, dict) and envelope.get("success") else None
@@ -264,7 +293,7 @@ def construir_modelo(envelope: dict, origem: str) -> ModeloResposta | None:
         fonte_explicacao=_fonte_da_explicacao(d),
         retrospectivo=AVISO_RETROSPECTIVO if d.get("retrospective") else None, historico=_historico(d),
         extracao=_extracao(d), detalhe_cobertura=detalhe, alerta_rota=_alerta_da_rota(d),
-        extracao_resumo=_extracao_resumo(d))
+        extracao_resumo=_extracao_resumo(d), mensagem_simples=_mensagem_simples(d))
 
 
 def selo_de_origem(origem: str) -> str:
@@ -313,27 +342,25 @@ def desenhar_resposta(m: ModeloResposta, nota: str | None = None) -> None:
                    "nova previsão.")
     if m.alerta_rota:
         _faixa("erro", m.alerta_rota)
-    st.markdown('<div class="gx-metric"><div class="gx-legenda">Curtidas centrais previstas (mediana do modelo)</div>'
-                f'<div class="gx-numero">{html.escape(m.curtidas_central)}</div></div>', unsafe_allow_html=True)
-    st.markdown(f"**Faixa de previsão:** {escapar_markdown(m.faixa)}.")
-    st.markdown(f"{escapar_markdown(m.referencia)} {escapar_markdown(m.comparacao)}")
+    st.markdown(m.mensagem_simples or escapar_markdown(m.explicacao))
     if m.retrospectivo:
-        _faixa("atencao", m.retrospectivo)
-    st.markdown("**Em palavras**")
-    st.markdown(escapar_markdown(m.explicacao))
-    st.caption(m.fonte_explicacao)
+        _faixa("atencao", "A data escolhida já passou. Se quiser simular uma publicação futura, ajuste a data e a hora.")
     _bloco_fatores(m)
-    _bloco_confianca(m)
-    st.caption(escapar_markdown(f"{m.modelo} {m.rota}"))
-    if m.extracao_resumo:
-        st.caption(m.extracao_resumo)
     if nota:
         st.caption(nota)
     with st.expander("Detalhes técnicos"):
+        st.caption("Mensagem principal formatada a partir dos valores calculados pelo modelo.")
+        st.markdown(escapar_markdown(f"{m.modelo} {m.rota}"))
         if m.historico:
             st.markdown(escapar_markdown(m.historico))
-        if m.detalhe_cobertura:
-            st.caption(m.detalhe_cobertura)
+        confianca = _sem_cobertura(m.confianca.texto)
+        if confianca:
+            st.markdown(f"**{escapar_markdown(m.confianca.titulo)}:** {escapar_markdown(confianca)}")
+        for aviso in m.avisos:
+            if "cobertura" not in aviso.texto.casefold():
+                st.caption(aviso.texto)
+        if m.extracao_resumo:
+            st.caption(m.extracao_resumo)
         for linha in m.extracao:
             st.markdown(f"- {escapar_markdown(linha)}")
 
@@ -341,20 +368,13 @@ def desenhar_resposta(m: ModeloResposta, nota: str | None = None) -> None:
 def _bloco_fatores(m: ModeloResposta) -> None:
     if not (m.fatores or m.familias):
         return
-    with st.expander("Principais fatores", expanded=True):
+    with st.expander("Principais fatores", expanded=False):
         st.caption(AVISO_SHAP)
         _lista(m.fatores)
         if m.familias:
             st.markdown("**Por grupo de informações**")
             _lista(m.familias)
 
-
-def _bloco_confianca(m: ModeloResposta) -> None:
-    classe = "atencao" if m.confianca.estado in ("indisponivel", "baixa") else "ok"
-    _faixa(classe, m.confianca.texto, m.confianca.titulo)
-    st.markdown(f"**Cobertura da faixa:** {escapar_markdown(m.cobertura)}")
-    for aviso in m.avisos:
-        _faixa("atencao" if aviso.classe == "atencao" else "", aviso.texto)
 
 
 def desenhar_turno(turno: Turno) -> None:
