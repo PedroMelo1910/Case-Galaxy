@@ -1,0 +1,3 @@
+# Os hashes dos artefatos dependem dos bytes originais, inclusive dos JSON.
+# Impede conversão automática LF/CRLF no clone do Windows.
+/data/execucao/** -text

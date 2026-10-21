@@ -27,15 +27,11 @@ _ROTULOS_DE_MODO = {MODO_NOVA: "Nova previsão", MODO_SALVA: "Reprodução de re
 
 
 def _cabecalho() -> None:
-    st.markdown('''<div class="gx-nav"><div class="gx-brand"><span class="gx-orbit" aria-hidden="true">✳</span>
-        <span>Galaxies<span class="gx-brand-sub"> / Creative Lab</span></span></div>
-        <span class="gx-academic">PROJETO ACADÊMICO</span></div>
-        <div class="gx-hero"><div class="gx-eyebrow">INTELIGÊNCIA PARA O SEU PRÓXIMO SHORT</div>
-        <h1>Antes de publicar,<br>explore o potencial.</h1>
-        <p>Transforme um vídeo em uma previsão de curtidas, com contexto,<br class="gx-desktop-break">
-        uma faixa de resultados e os fatores que pesaram na análise.</p></div>
-        <div class="gx-steps"><span><b>01</b> Envie seu vídeo</span><span><b>02</b> Informe o contexto</span>
-        <span><b>03</b> Explore a previsão</span></div>''', unsafe_allow_html=True)
+    st.markdown(f'<div class="gx-nav"><div class="gx-brand">{tema.logo_html()}'
+                '<span>Galaxies<span class="gx-brand-sub"> / Creative Lab</span></span></div></div>'
+                '<div class="gx-steps"><span><b>01</b> Envie seu vídeo</span>'
+                '<span><b>02</b> Informe o contexto</span>'
+                '<span><b>03</b> Explore a previsão</span></div>', unsafe_allow_html=True)
 
 
 def _resumo_da_entrada(e: EntradaFormulario, canais: dict) -> tuple[str, ...]:

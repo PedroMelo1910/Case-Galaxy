@@ -107,24 +107,15 @@ def ler_formulario(canais: tuple[CanalBase, ...], online_disponivel: bool, desab
     criativo, contexto = st.columns([1.05, 1], gap="large")
     with criativo:
         st.markdown('<div class="gx-section"><span>01</span><h3>Seu criativo</h3></div>', unsafe_allow_html=True)
-        st.caption("O próximo vídeo da sua marca começa aqui.")
-        st.markdown('''<div class="gx-video-note"><span class="gx-play" aria-hidden="true">▶</span>
-            <strong>Um novo olhar para o seu vídeo</strong>
-            <p>Envie um Short vertical ou quadrado.<br>Até 3 minutos · arquivo de até 100 MB</p></div>''',
-                    unsafe_allow_html=True)
         video = st.file_uploader("Vídeo", type=list(EXTENSOES_VIDEO), key="f_video", disabled=desabilitado,
                                  help="Short de até 180 s, vertical ou quadrado, até 100 MB.")
         with st.expander("Título e legenda (opcionais)"):
             titulo = st.text_input("Título (opcional)", key="f_titulo", disabled=desabilitado)
             descricao = st.text_area("Legenda ou contexto (opcional)", key="f_descricao", height=90,
                                      disabled=desabilitado)
-        st.markdown('''<div class="gx-expect"><strong>O que você vai receber</strong>
-            <p>Estimativa de curtidas e faixa de previsão</p><p>Comparação com o histórico do canal</p>
-            <p>Explicação dos principais fatores e limitações</p></div>''', unsafe_allow_html=True)
     with contexto:
         st.markdown('<div class="gx-section"><span>02</span><h3>Contexto da publicação</h3></div>',
                     unsafe_allow_html=True)
-        st.caption("O mesmo vídeo pode ter resultados diferentes em cada canal.")
         setor = st.selectbox("Setor", SETORES, index=None, key="f_setor", placeholder="Escolha o setor",
                              disabled=desabilitado)
         col_data, col_hora = st.columns(2)

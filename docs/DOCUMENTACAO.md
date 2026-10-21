@@ -316,7 +316,7 @@ No Linux: `uv run casegalaxy-interface --abrir-navegador`. A interface usa `127.
 
 O formulário atual aceita somente upload de um arquivo de vídeo e reúne setor, data planejada e contexto do canal. Não oferece entrada de URL, imagem, texto nem ranking. Essas operações existem na API Python e no MCP. Em vídeo, a legenda é opcional e a rota fica nas opções avançadas. O modo automático usa o preditor local para arquivo quando disponível. Na API Python e no MCP, URL pública segue a rota Gemini; não se transforma em download automático pelo produto.
 
-O resultado mostra valor central, faixa, referência, comparação relativa, fatores SHAP, comparáveis, rota, versão e avisos. Durante uma execução o envio fica bloqueado. Uma resposta salva é identificada como resultado anterior e não prova que houve nova execução.
+O resultado resume em linguagem simples as curtidas previstas, a faixa estimada e a comparação com a referência do canal ou setor. Os fatores SHAP ficam em **Principais fatores**; rota, versão, origem do histórico e avisos ficam em **Detalhes técnicos**, ambos recolhidos inicialmente. A cobertura estatística permanece na API e nesta documentação, sem aparecer na interface. Durante uma execução o envio fica bloqueado. Uma resposta salva é identificada como resultado anterior e não prova que houve nova execução.
 
 Na rota Gemini, falha da anotação pode levar ao modelo de imagem quando há capa disponível. Essa resposta recebe a rota `video_gemini_fallback_imagem` e evidência limitada. A rota local não faz esse fallback: falha de extração ou ausência de modelo é erro explícito.
 
@@ -982,7 +982,7 @@ Possíveis melhorias do projeto:
 |---|---|
 | Ambiente incompleto | Execute `verificar` e `verificar-av`; obtenha pesos ausentes. Demonstração/MCP e extração usam saída 3 para pesos ausentes; a CLI `casegalaxy-demo-local` usa saída 4 para ambiente ou pacote indisponível |
 | Modelos incluídos ausentes | Confira se `data/execucao/manifesto.json` e `data/execucao/modelos/` acompanharam o clone. Não é necessário obter pacote externo |
-| Hash divergente ou grupo vencido | Interrompa a instalação; confira a versão correspondente e os prazos do manifesto |
+| Hash divergente | Confira os arquivos do pacote e mantenha o `.gitattributes`, que impede conversão LF/CRLF dos artefatos. O verificador de pesos não verifica os pacotes treinados; para obter a causa do carregamento no Windows execute `.\.venv-windows\Scripts\python.exe -c "from src.agente.servicos import Servicos; Servicos.padrao(); print('Modelos carregados OK')"` |
 | Porta ocupada | Use `--porta 8502` ou outra porta livre; não encerre instâncias sem identificar sua origem |
 | Alterações visuais não aparecem | Encerre e reabra a própria instância: o lançador desativa o observador de arquivos |
 | `HISTORICO_INDISPONIVEL` | Informe histórico válido ou use canal da base; consulta online requer configuração e cota |

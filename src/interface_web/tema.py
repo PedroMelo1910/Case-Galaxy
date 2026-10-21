@@ -4,11 +4,15 @@ Cores e fontes vêm do site público da Galaxies (https://www.galaxieslabs.com/p
 página inicial: fundo da página `#f9fafb`, superfícies brancas e `#ebecf0`, azul de ação `#0065ff`, botão escuro e
 títulos `#111827`, texto `#374151`, texto secundário `#6b7280`, bordas `#d1d5db`/`#e5e7eb`, famílias DM Sans e Inter.
 Os tons de estado (`#eb3131`, `#ffdc42`, `#4ef263`) são tokens de cor declarados na mesma página; aqui só marcam
-bordas e faixas, nunca texto. O logotipo da empresa não é usado.
+bordas e faixas, nunca texto. O logotipo da Galaxies identifica a referência visual do projeto acadêmico.
 
 As fontes não são baixadas de servidores externos: a pilha usa DM Sans e Inter se estiverem instaladas e, senão, a
 fonte padrão do sistema.
 """
+
+import base64
+from functools import lru_cache
+from pathlib import Path
 
 FUNDO = "#f9fafb"
 SUPERFICIE = "#ffffff"
@@ -25,8 +29,16 @@ ESTADO_OK = "#4ef263"
 FONTE = '"DM Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif'
 FONTE_STREAMLIT = "DM Sans, Inter, system-ui, Segoe UI, sans-serif"
 
-AVISO_PROTOTIPO = ("Protótipo acadêmico do Inteli Academy. Não é um serviço da Galaxies nem tem endosso da empresa; "
-                   "as cores apenas seguem a identidade visual pública dela.")
+AVISO_PROTOTIPO = "Protótipo acadêmico do Inteli Academy. Não é um serviço da Galaxies nem tem endosso da empresa."
+
+
+@lru_cache(maxsize=1)
+def logo_html() -> str:
+    """Imagem local incluída no repositório; nenhuma requisição externa."""
+    imagem = Path(__file__).with_name("assets") / "galaxies.png"
+    dados = base64.b64encode(imagem.read_bytes()).decode("ascii")
+    return f'<img class="gx-logo" src="data:image/png;base64,{dados}" alt="Galaxies" width="42" height="42">'
+
 
 
 def opcoes_streamlit() -> dict[str, str]:
@@ -49,10 +61,10 @@ html, body, [data-testid="stAppViewContainer"], .stApp {{ font-family: {FONTE}; 
 [data-testid="stHeader"] {{ background: transparent; }}
 .block-container {{ max-width: 1160px; padding: 1.3rem 2rem 3rem; }}
 h1, h2, h3 {{ color: {TINTA}; font-weight: 650; letter-spacing: -0.035em; }}
-.gx-nav {{ display:flex; align-items:center; justify-content:space-between; padding: 0.35rem 0 1.35rem;
+.gx-nav {{ display:flex; align-items:center; justify-content:space-between; padding: 0.1rem 0 0.75rem;
   border-bottom:1px solid {BORDA_SUAVE}; gap:1rem; }}
 .gx-brand {{ display:flex; align-items:center; gap:0.65rem; font-size:1.16rem; font-weight:750; color:{TINTA}; }}
-.gx-orbit {{ width:34px; height:34px; display:grid; place-items:center; color:{PRIMARIA}; font-size:2rem; }}
+.gx-logo {{ width:42px; height:42px; display:block; object-fit:contain; border-radius:8px; flex-shrink:0; }}
 .gx-brand-sub {{ font-size:0.95rem; font-weight:400; color:{TEXTO_SUAVE}; margin-left:0.3rem; }}
 .gx-academic {{ font-size:0.65rem; letter-spacing:0.12em; font-weight:650; color:{TEXTO};
   padding:0.45rem 0.65rem; border:1px solid {BORDA}; border-radius:6px; white-space:nowrap; }}
@@ -61,7 +73,7 @@ h1, h2, h3 {{ color: {TINTA}; font-weight: 650; letter-spacing: -0.035em; }}
 .gx-hero h1 {{ font-size:clamp(2.15rem, 4.1vw, 3.4rem); line-height:1.07; padding:0; margin:0 0 1rem;
   font-weight:700; letter-spacing:-0.055em; max-width:850px; }}
 .gx-hero p {{ font-size:1rem; line-height:1.7; color:{TEXTO_SUAVE}; margin:0; }}
-.gx-steps {{ display:flex; gap:2.2rem; margin:0 0 1.1rem; color:{TEXTO}; font-size:0.79rem; flex-wrap:wrap; }}
+.gx-steps {{ display:flex; gap:2.2rem; margin:0.85rem 0 1rem; color:{TEXTO}; font-size:0.79rem; flex-wrap:wrap; }}
 .gx-steps b {{ color:{PRIMARIA}; margin-right:0.45rem; font-size:0.7rem; }}
 .st-key-gx_workspace {{ background:{SUPERFICIE}; border-radius:20px;
   border-color:{BORDA_SUAVE} !important; padding:1rem !important;
