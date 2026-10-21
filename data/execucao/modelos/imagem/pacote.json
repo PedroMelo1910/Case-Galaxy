@@ -1,0 +1,326 @@
+{
+  "tipo": "pacote_final",
+  "versao": "1",
+  "id": "imagem-361551e0e0f7-c62b81db",
+  "gerado_em_utc": "2026-10-18T21:52:56Z",
+  "modalidade": "imagem",
+  "nivel_do_modelo": "N3: histórico, legenda e capa (modelo reduzido; refit final)",
+  "versao_servida": "final=v1/imagem-361551e0e0f7-c62b81db",
+  "modelos": {
+    "q50": {
+      "pasta": "q50",
+      "sha256_modelo": "94557774cfb97ad59ef89ac98b5a359a245c4b1b15286addb3014363bc2b9aab",
+      "sha256_metadados": "0cffba04080247188001ec41fc29d1a4c912278bf3b2c75e964b042be5c753fe",
+      "sha256_preprocessador": "f77022f377ee53d568c9075c6a0dc9eba914b8f45774e5018fa5bb1a74b393b0"
+    },
+    "q10": {
+      "pasta": "q10",
+      "sha256_modelo": "1b5d517aa311801bab0675d2783c31266707bd30183b0e42143e019618338f3e",
+      "sha256_metadados": "6875e3be852c70e10c46199dd1409fa7582349caa0df4221206628e314ae82c7",
+      "sha256_preprocessador": "f77022f377ee53d568c9075c6a0dc9eba914b8f45774e5018fa5bb1a74b393b0"
+    },
+    "q90": {
+      "pasta": "q90",
+      "sha256_modelo": "a012c6e3f65d8dba9a4a5d6d96aca4f7e5b30d264418e3763f3f725f79b22c75",
+      "sha256_metadados": "63f831e3e80a5d35844e0b44a257e1668e9094eaeff774e702ebbc72a8c35e08",
+      "sha256_preprocessador": "f77022f377ee53d568c9075c6a0dc9eba914b8f45774e5018fa5bb1a74b393b0"
+    }
+  },
+  "identidade_sha256": "058ab362bc183e9447e86e4da2ca158b41d2c2afc53d31ed331b420e4d8e9fec",
+  "populacao": {
+    "n_linhas": 1500,
+    "n_canais": 16,
+    "por_setor": {
+      "automotivo": 1227,
+      "beleza": 273
+    },
+    "por_bloco": {
+      "teste_1": 153,
+      "teste_2": 152,
+      "teste_3": 147,
+      "treino": 831,
+      "validacao": 217
+    },
+    "sha256_ids": "c6378d30ca30ef10b41a480358b171ce4abfb9fd1268aa7af75c35387703b01a",
+    "sha256_canais": "7e12066191c38e1a5112950edbc95ddfa0419180d527d6ae93add370fcdad297",
+    "excluidos_por_falta_de_referencia_ou_alvo": {
+      "n": 0,
+      "sha256_ids": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "reconciliacao_do_dataset": {
+      "na_amostra": 1500,
+      "fora_do_n1": 0,
+      "excluidos_por_uso": {},
+      "sem_alvo_ou_referencia": 0,
+      "por_uso": {
+        "treino": 1500
+      },
+      "n_ids": 1500,
+      "sha256_ids": "c6378d30ca30ef10b41a480358b171ce4abfb9fd1268aa7af75c35387703b01a",
+      "nota": "fora_do_n1 são os blocos de teste protegidos, contados só por ID; nenhum rótulo foi lido"
+    },
+    "n_treino": 1500,
+    "n_validacao": 0,
+    "nota": "n_validacao = 0: o refit não tem conjunto de validação nem de avaliação"
+  },
+  "contexto": {
+    "nome": "final",
+    "treino_ate_utc": "2026-09-13T23:29:47Z",
+    "canais_excluidos": [],
+    "defasagem_dias": 30,
+    "regra": "treino_ate_utc = última publicação entre os alvos da amostra; toda linha é treino; sem intervalo excluído, sem bloco avaliado e sem canal retido"
+  },
+  "especificacao": {
+    "escalares": [
+      "hist_ref_log_mediana",
+      "hist_log_media",
+      "hist_mme_log",
+      "hist_n_posts",
+      "hist_ref_setor",
+      "dias_desde_post_anterior",
+      "posts_90d",
+      "dia_semana_local",
+      "hora_local",
+      "leg_n_caracteres_titulo",
+      "leg_n_caracteres_descricao",
+      "leg_n_palavras",
+      "leg_n_hashtags",
+      "leg_n_tags",
+      "leg_n_emojis",
+      "leg_n_links",
+      "leg_tem_descricao",
+      "cor_dominante_r",
+      "cor_dominante_g",
+      "cor_dominante_b",
+      "cor_fracao_dominante",
+      "cor_brilho",
+      "cor_contraste",
+      "cor_saturacao",
+      "rosto_presente",
+      "rosto_n",
+      "rosto_maior_fracao_area",
+      "ocr_tem_texto",
+      "ocr_n_caixas",
+      "ocr_n_caracteres",
+      "ocr_n_palavras",
+      "ocr_fracao_area"
+    ],
+    "categoricas": [
+      "setor",
+      "tipo_canal"
+    ],
+    "embeddings": {
+      "leg_emb": 8,
+      "capa_emb": 8
+    },
+    "sha256": "f5873c9f031690357dacb16f87cd8159e9deb2ce52f918d96ff1456866fbf244",
+    "atributos_de_saida": [
+      "hist_ref_log_mediana",
+      "hist_log_media",
+      "hist_mme_log",
+      "hist_n_posts",
+      "hist_ref_setor",
+      "dias_desde_post_anterior",
+      "posts_90d",
+      "dia_semana_local",
+      "hora_local",
+      "leg_n_caracteres_titulo",
+      "leg_n_caracteres_descricao",
+      "leg_n_palavras",
+      "leg_n_hashtags",
+      "leg_n_tags",
+      "leg_n_emojis",
+      "leg_n_links",
+      "leg_tem_descricao",
+      "cor_dominante_r",
+      "cor_dominante_g",
+      "cor_dominante_b",
+      "cor_fracao_dominante",
+      "cor_brilho",
+      "cor_contraste",
+      "cor_saturacao",
+      "rosto_presente",
+      "rosto_n",
+      "rosto_maior_fracao_area",
+      "ocr_tem_texto",
+      "ocr_n_caixas",
+      "ocr_n_caracteres",
+      "ocr_n_palavras",
+      "ocr_fracao_area",
+      "setor",
+      "tipo_canal",
+      "leg_emb_pc0",
+      "leg_emb_pc1",
+      "leg_emb_pc2",
+      "leg_emb_pc3",
+      "leg_emb_pc4",
+      "leg_emb_pc5",
+      "leg_emb_pc6",
+      "leg_emb_pc7",
+      "capa_emb_pc0",
+      "capa_emb_pc1",
+      "capa_emb_pc2",
+      "capa_emb_pc3",
+      "capa_emb_pc4",
+      "capa_emb_pc5",
+      "capa_emb_pc6",
+      "capa_emb_pc7"
+    ],
+    "n_atributos_de_saida": 50,
+    "duracao_s_e_preditor": false,
+    "referencia_aprovada": {
+      "pasta": "data/models/provisorio=v1/2a4739584168-c62b81db",
+      "sha256_metadados": "af1da34ec918ef3fbb8f04328092715ac27fa2ae74fb6ad7ad25dfe6bef60b44",
+      "sha256_modelo": "ca04299026161840f05a807c7e24fb817f1b8d7146d9f7f7894bf5ea085ca57a",
+      "parametros": "idênticos à CONFIGURACAO_A"
+    }
+  },
+  "parametros": {
+    "objective": "quantile",
+    "alpha": 0.5,
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 7,
+    "min_child_samples": 10,
+    "reg_lambda": 1.0,
+    "subsample": 0.8,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.8,
+    "random_state": 20261015,
+    "n_jobs": 4,
+    "deterministic": true,
+    "force_row_wise": true,
+    "verbose": -1
+  },
+  "sementes": {
+    "lightgbm": 20261015,
+    "preprocessador": 20261015,
+    "pca_componentes_por_bloco": 8
+  },
+  "regra_da_faixa": "q50 central; limites = mínimo e máximo das três saídas reconstruídas e não negativas; sem CQR",
+  "alvo": "y_rel = log1p(curtidas) − ref_log; previsão = ref_log + saída, cortada em 0",
+  "cobertura_do_procedimento": {
+    "nome": "faixa de previsão",
+    "contexto": "teste_final",
+    "modelo": "N3 (imagem: histórico, legenda e capa)",
+    "nivel_nominal": 0.8,
+    "cobertura_observada": 0.6305309734513275,
+    "n_dentro": 285,
+    "n": 452,
+    "ic95_bootstrap_por_canal": [
+      0.5045678969115484,
+      0.7758620689655172
+    ],
+    "abaixo_do_pretendido": true,
+    "por_setor": [
+      {
+        "setor": "automotivo",
+        "texto": "automotivo: 232 de 346 vídeos (67,1%), 12 canais; IC 95% por canal 55,2% a 79,4%",
+        "ic_estado": "estimado"
+      },
+      {
+        "setor": "beleza",
+        "texto": "beleza: 53 de 106 vídeos (50,0%), 4 canais; IC 95% por canal 28,9% a 85,7% (aproximado: poucos canais)",
+        "ic_estado": "estimado_aproximado"
+      }
+    ],
+    "aviso": "Faixa de previsão do modelo N3 (imagem: histórico, legenda e capa), com nível pretendido de 80%. No teste final retrospectivo aproximado (consulta única), 285 de 452 vídeos (63,1%) ficaram dentro dela (abaixo do pretendido; IC 95% por canal 50,5% a 77,6%). É a estimativa do teste final retrospectivo aproximado (consulta única), medida sobre a faixa corrigida (q50 central; limites = mínimo e máximo das três saídas); descreve o procedimento, não o artefato servido, e é sem garantia para novos vídeos. O modelo servido foi retreinado com todos os vídeos anotados da amostra, inclusive os de teste: esta cobertura foi medida pelo procedimento de avaliação congelado em 452 vídeos de teste e NÃO foi medida neste artefato. Métricas calculadas sobre os vídeos do ajuste não são desempenho independente. Não há cobertura garantida para vídeos novos.",
+    "origem": "procedimento_de_avaliacao_congelado",
+    "nivel_do_procedimento": "N3",
+    "medida_no_artefato_servido": false,
+    "garantia_de_cobertura": false,
+    "n_canais": 16,
+    "n_videos_de_teste": 452,
+    "procedimento": {
+      "consulta": "única, 18/10/2026",
+      "arquivo": "principal.json",
+      "sha256_arquivo": "4216e90c5d375f62ac5c1f11d3cef54a7b8a494f5b518440ac91234012b5915f",
+      "protocolo_sha256": "4a2ef2442edd9f3ce943ad454e7c67d74a29c5d407d523c1b378eb484156e94f",
+      "metodo_do_intervalo": "bootstrap por canal (percentil 2,5–97,5, reposição); não usa Wilson, que ignora o agrupamento por canal"
+    }
+  },
+  "fontes": {
+    "dataset": {
+      "pasta": "data/features/snapshot=20261014T021437Z/desenvolvimento_final_imagem=v1/361551e0e0f7",
+      "sha256": "361551e0e0f7350fa10733f1c7c006f83982ec3046463745c5c65a738ea21ee5",
+      "sha256_manifesto": "5f04c0849e277db2bc2247b2aea50a08bcaea3c7f755b732caa1c4a1a094687e",
+      "versao": "1",
+      "tipo": "dataset_modalidade"
+    },
+    "historico_n1": {
+      "sha256": "92e3bd464a12028c0235be3473b77874fa4e37ae70f764f8c5849d73db006100",
+      "sha256_manifesto": "e2ae1868ebd9bd70c75b0b9111ae9ad90101d03f71d8d18a7a8bbd453310f767"
+    },
+    "base_curada": {
+      "pasta": "data/processed/snapshot=20261014T021437Z/curadoria=v1",
+      "snapshot_id": "20261014T021437Z",
+      "sha256_manifesto": "479693ef47e4eaf11d56f481a5bb5399b6fcfe33b3878727626fe8fde2664a6e",
+      "sha256_manifesto_registrado": "479693ef47e4eaf11d56f481a5bb5399b6fcfe33b3878727626fe8fde2664a6e"
+    },
+    "particao": {
+      "arquivo": "particao=v1/particao.json",
+      "versao": "1",
+      "sha256_arquivo": "149392b7af27e6fcbe5c42ce82feeb0bc6046922b39d7f6304f58b3679529096",
+      "sha256_atribuicao": "a8ea2570b656082389f81adc3fc291a4c84956329879776aaee85772a2d71fd8"
+    },
+    "amostra": {
+      "sha256_lista": "e508df6955f73ff99586ea80f3096379b92c43331366de293f105b3ef876c0ca",
+      "n_planejado": 1500
+    },
+    "legenda_capa": {
+      "pasta": "data/features/snapshot=20261014T021437Z/legenda_capa=v1",
+      "sha256_legenda": "73f721986f094dec63810e430b503cb0eb1afdf4c8486919f72cbfb4f826708b",
+      "sha256_capa": "6d987d163fc5034088b8b2c509f75f952928503e580007e30a5aa803fc6c7322",
+      "sha256_manifesto": "794b086bb8dfd91053f141706c8578dbe612e689452cbac5a199debd031dac97"
+    }
+  },
+  "codigo": {
+    "modulos_sha256": {
+      "src/modelo_desenvolvimento.py": "bbe16981bdfcf567e820266d992a48650957dfa6a0b83af225587d34aff2d8a2",
+      "src/modelo_modalidades.py": "795d730c2f007a9409f2340162315b2ceae062c8a70d97c063407ef4660c7e67",
+      "src/faixa_previsao.py": "a8450220533017d2c8af5e899b3c331dc649c228ecc04ba62f7e6601cc5f39d2",
+      "src/preprocessador.py": "ba43ef74d8449bbca5b2775ec191de5054b0979cfd716815338efd11570710bd",
+      "src/familias_atributos.py": "b578f4c7cacf0cd76029002a6c6568ed23b4f10dcfef71526d045b0299c7c7d2",
+      "src/dataset_desenvolvimento.py": "4e29282de928ce1b029902e000f89dd01beb0ac876793630a93a1aed3e28e85a",
+      "src/dataset_modalidades.py": "9ba4e0cc7b0dc20acb3817bb77adc1f6c5ee8032760818dbb9bcc9cc4d816d2d",
+      "src/historico.py": "59c724a9ea67904316d7aea4c7ee8919f3ae59e2ec17afaa0865f28f6473ef70",
+      "src/refit_dados.py": "ca75b2d28925a095bde535d6052d6f1ec7a6745fc25c5506eab3cc4ce34d2104",
+      "src/refit_treino.py": "109297e81c2651924bf42842ca10a69be2e624aab079ae09a7fadc40e98f1281",
+      "src/refit_cobertura.py": "176ab571c959cb49b1a2fe7ccd03b6287a65b56ad0464583db25c9b14fecbb26",
+      "src/avaliacao/contextos_finais.py": "cc9e9d89c1742cc50a021b34cf466333a91aebfd562d853b7026bbfc82c0326b",
+      "src/avaliacao/declaracao_faixa.py": "0d45413921059850ab639f28eb7f02fcc6bc9349083819a8b7997b776cf2fdcb",
+      "src/avaliacao/driver_lim.py": "d26b0067e0963d7b53b7265180441e95d6ec3604b664b9d58db65ac93f2095b7",
+      "src/avaliacao/limiar_lim.py": "83579cb1b06bf3e7c97402150629abb45386c5666eb6b41cef79e8e9d91c79c1"
+    }
+  },
+  "dependencias": {
+    "python": "3.12.15",
+    "plataforma": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "lightgbm": "4.7.0",
+    "scikit-learn": "1.9.1",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "pyarrow": "26.0.0",
+    "joblib": "1.6.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  },
+  "retencao": {
+    "dataset_menor_prazo": "2026-11-13T02:14:37Z",
+    "anotacoes_dos_alvos": "2026-11-03T23:46:26Z",
+    "lim_legenda_capa_e_base": "2026-11-13T02:14:37Z",
+    "apagar_ate_utc": "2026-11-03T23:46:26Z",
+    "regra": "dados derivados herdam o menor prazo; modelo e metadados do pacote devem ser revistos ou apagados com os dados de origem (D-B9)"
+  },
+  "limitacoes": [
+    "Refit final: o modelo foi ajustado com todos os vídeos anotados da amostra congelada, inclusive os 452 vídeos de teste; a LIM ficou fora. Não existe conjunto independente para este artefato.",
+    "A cobertura da faixa é a do procedimento de avaliação (consulta única, 452 vídeos), não foi medida neste artefato e não é garantia para vídeos novos; ficou abaixo dos 80% pretendidos.",
+    "Métricas calculadas sobre os vídeos do ajuste não são desempenho independente e nunca devem ser reportadas como tal.",
+    "Avaliação retrospectiva aproximada: curtidas lidas na coleta, histórico com defasagem de 30 dias, 16 canais, 82% automotivo; a Camada 1 local do TAPI §6.3 não foi atendida (desvio declarado).",
+    "Os limites da faixa são o mínimo e o máximo das três saídas não negativas, com o q50 central (sem CQR)."
+  ],
+  "lim": {
+    "fora_do_ajuste": true,
+    "uso": "não usada: imagem e texto não têm limiar (sinal sempre ligado)"
+  }
+}

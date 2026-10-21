@@ -5,6 +5,8 @@
 
 # Ambiente virtual e build
 .venv/
+.venv-windows/
+.windows/
 dist/
 build/
 *.egg-info/
@@ -16,8 +18,23 @@ __pycache__/
 .mypy_cache/
 .ipynb_checkpoints/
 
-# Dados coletados, modelos treinados e registros de experimentos: nunca versionados
-data/
+# Dados de pesquisa e registros privados ficam fora; só os pacotes servidos abaixo são incluídos
+/data/*
+!/data/execucao/
+/data/execucao/**
+!/data/execucao/manifesto.json
+!/data/execucao/modelos/
+!/data/execucao/modelos/*/
+!/data/execucao/modelos/*/pacote.json
+!/data/execucao/modelos/*/manifesto_arquivos.json
+!/data/execucao/modelos/*/q10/
+!/data/execucao/modelos/*/q50/
+!/data/execucao/modelos/*/q90/
+!/data/execucao/modelos/*/q*/modelo.joblib
+!/data/execucao/modelos/*/q*/preprocessador.joblib
+!/data/execucao/modelos/*/q*/metadados.json
+!/data/execucao/modelos/*/limiar/
+!/data/execucao/modelos/*/limiar/limiar_largura_servido.json
 models/
 mlruns/
 mlflow.db
@@ -28,3 +45,7 @@ desktop.ini
 *:Zone.Identifier
 .vscode/
 .idea/
+
+# Pacotes antigos da pesquisa não integram o repositório de execução
+casegalaxy_distribuicao_v*/
+*.tar.gz

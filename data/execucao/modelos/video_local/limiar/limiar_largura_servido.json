@@ -1,0 +1,11 @@
+{
+  "papel": "servido",
+  "sha256_pacote": "e31c2997301ca5259d5c03b65e4efd59359ded4ce0bcc41e1ec1611bd5bba3c3",
+  "ids_sha256": "e59ed97e446a472f99c654819d764a018eb1f19645dec4f88b117404ad4c6656",
+  "n": 100,
+  "percentil": 80.0,
+  "valor": 2.6120908344016516,
+  "nota": "Limiar calculado nas larguras das previsões da LIM, sem rótulos; a LIM não calibra nem seleciona nada. Sinaliza previsões mais largas que as demais e não garante cobertura da faixa.",
+  "gravado_em_utc": "2026-10-21T08:54:08Z",
+  "sha256": "e63799ce30a41e0f2e724b0d6023e913b0258552fc4a3a9058d3e16ce10407c6"
+}

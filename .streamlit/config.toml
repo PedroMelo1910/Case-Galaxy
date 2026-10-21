@@ -1,0 +1,28 @@
+# Interface local: só localhost, sem telemetria, sem abrir páginas externas. Os mesmos valores são repassados por
+# `casegalaxy-interface` (src/interface_web/lancar.py), de modo que valem de qualquer pasta.
+[server]
+address = "127.0.0.1"
+headless = true
+maxUploadSize = 100
+enableCORS = true
+enableXsrfProtection = true
+runOnSave = false
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false
+serverAddress = "127.0.0.1"
+
+[client]
+showErrorDetails = "none"
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#0065ff"
+backgroundColor = "#f9fafb"
+secondaryBackgroundColor = "#ebecf0"
+textColor = "#111827"
+font = "DM Sans, Inter, system-ui, Segoe UI, sans-serif"
+baseRadius = "12px"
+borderColor = "#d1d5db"
