@@ -13,7 +13,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Protocol
 
-from src import gemini_api as ga
+from src.integracoes import gemini as ga
 
 N_DRIVERS = 5
 MAX_CARACTERES_RESPOSTA = 6_000
@@ -49,6 +49,33 @@ ROTULOS = {
     "gem_before_after_ou_transformacao": "antes e depois", "gem_try_on_ou_demonstracao": "demonstração ou prova",
     "gem_texto_na_tela": "texto na tela", "gem_tom_narracao": "tom da narração",
 }
+ROTULOS |= {
+    "avl_duracao_s": "duração medida no arquivo", "avl_tem_audio": "presença de áudio",
+    "avl_brilho_medio": "brilho médio dos quadros", "avl_brilho_std": "variação do brilho entre quadros",
+    "avl_contraste_medio": "contraste médio dos quadros", "avl_contraste_std": "variação do contraste entre quadros",
+    "avl_saturacao_medio": "saturação média dos quadros", "avl_saturacao_std": "variação da saturação entre quadros",
+    "avl_cor_r": "cor dominante dos quadros (vermelho)", "avl_cor_g": "cor dominante dos quadros (verde)",
+    "avl_cor_b": "cor dominante dos quadros (azul)", "avl_cor_fracao_dominante": "fração da cor dominante nos quadros",
+    "avl_fluxo_medio": "movimento médio", "avl_fluxo_std": "variação do movimento",
+    "avl_fluxo_p90": "movimento intenso dos quadros", "avl_diff_quadros_medio": "mudança média entre quadros",
+    "avl_cortes_n": "número de cortes de cena", "avl_cortes_por_10s": "cortes de cena por dez segundos",
+    "avl_cena_media_s": "duração média das cenas", "avl_cena_max_frac": "fração ocupada pela maior cena",
+    "avl_cortes_gancho_n": "cortes de cena no início do vídeo",
+    "avl_rosto_frac_quadros": "fração de quadros com rosto", "avl_rosto_n_max": "máximo de rostos em um quadro",
+    "avl_rosto_area_max": "área do maior rosto nos quadros", "avl_rosto_gancho_frac": "rosto no início do vídeo",
+    "avl_ocr_frac_quadros": "fração de quadros com texto na tela", "avl_ocr_caracteres_medio": "caracteres de texto na tela",
+    "avl_ocr_area_media": "área ocupada por texto na tela", "avl_ocr_gancho_frac": "texto na tela no início do vídeo",
+    "avl_obj_pessoa_frac_quadros": "fração de quadros com pessoa", "avl_obj_pessoa_area_max": "área da maior pessoa nos quadros",
+    "avl_obj_veiculo_frac_quadros": "fração de quadros com veículo", "avl_obj_n_max": "máximo de objetos em um quadro",
+    "avl_obj_classes_distintas": "variedade de objetos detectados",
+    "avl_aud_rms_db_medio": "volume médio do áudio", "avl_aud_rms_db_std": "variação do volume do áudio",
+    "avl_aud_pico_db": "pico de volume do áudio", "avl_aud_fracao_ativa": "fração do áudio com som",
+    "avl_aud_faixa_dinamica_db": "faixa dinâmica do áudio", "avl_aud_centroide_hz": "brilho espectral do áudio",
+    "avl_aud_planura": "planura espectral do áudio", "avl_fala_palavras": "palavras faladas",
+    "avl_fala_palavras_por_s": "ritmo de fala no vídeo", "avl_fala_palavras_por_s_fala": "ritmo de fala nos trechos falados",
+    "avl_fala_fracao_tempo": "fração do tempo com fala", "avl_fala_idioma": "idioma da fala",
+    "avl_fala_prob_idioma": "confiança no idioma da fala",
+}
 _PC = re.compile(r"_pc\d+$")
 CAUSAIS = ("porque", "causa", "causou", "causad", "devido", "por conta", "por isso", "graças", "provoca", "provocou",
            "faz com que", "fez com que", "resulta em", "resultou em", "garante", "impulsion", "responsável por",
@@ -75,12 +102,16 @@ def familia(nome: str) -> str:
         return "legenda"
     if nome.startswith(("cor_", "rosto_", "ocr_", "capa_")):
         return "capa"
+    if nome.startswith("avl_"):
+        return "atributos audiovisuais locais"
     if nome.startswith("gem_transc"):
         return "transcrição"
     return "atributos do vídeo (Gemini)"
 
 
 def rotulo(nome: str) -> str:
+    if nome.startswith("avl_estado_") and nome not in ROTULOS:
+        return f"situação da etapa {nome.removeprefix('avl_estado_')} da extração"
     return ROTULOS.get(nome, nome.replace("_", " "))
 
 

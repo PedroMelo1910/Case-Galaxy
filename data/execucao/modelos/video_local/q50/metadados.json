@@ -1,0 +1,118 @@
+{
+  "versao": "1",
+  "sha256_modelo": "080f5626f7046c42cf5bdbe3640a1ed625c10a882c29a327cf4cac3087652705",
+  "parametros": {
+    "objective": "quantile",
+    "alpha": 0.5,
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 7,
+    "min_child_samples": 10,
+    "reg_lambda": 1.0,
+    "subsample": 0.8,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.8,
+    "random_state": 20261015,
+    "n_jobs": 4,
+    "deterministic": true,
+    "force_row_wise": true,
+    "verbose": -1
+  },
+  "categoricas_nativas": false,
+  "especificacao": {
+    "escalares": [
+      "hist_ref_log_mediana",
+      "hist_log_media",
+      "hist_mme_log",
+      "hist_n_posts",
+      "hist_ref_setor",
+      "dias_desde_post_anterior",
+      "posts_90d",
+      "duracao_s",
+      "dia_semana_local",
+      "hora_local"
+    ],
+    "categoricas": [
+      "setor",
+      "tipo_canal"
+    ],
+    "embeddings": {
+      "avl_emb_gancho": 8,
+      "avl_emb_media": 8
+    }
+  },
+  "atributos_de_saida": [
+    "hist_ref_log_mediana",
+    "hist_log_media",
+    "hist_mme_log",
+    "hist_n_posts",
+    "hist_ref_setor",
+    "dias_desde_post_anterior",
+    "posts_90d",
+    "duracao_s",
+    "dia_semana_local",
+    "hora_local",
+    "setor",
+    "tipo_canal",
+    "avl_emb_gancho_pc0",
+    "avl_emb_gancho_pc1",
+    "avl_emb_gancho_pc2",
+    "avl_emb_gancho_pc3",
+    "avl_emb_gancho_pc4",
+    "avl_emb_gancho_pc5",
+    "avl_emb_gancho_pc6",
+    "avl_emb_gancho_pc7",
+    "avl_emb_media_pc0",
+    "avl_emb_media_pc1",
+    "avl_emb_media_pc2",
+    "avl_emb_media_pc3",
+    "avl_emb_media_pc4",
+    "avl_emb_media_pc5",
+    "avl_emb_media_pc6",
+    "avl_emb_media_pc7"
+  ],
+  "dependencias": {
+    "python": "3.12.15",
+    "lightgbm": "4.7.0",
+    "scikit-learn": "1.9.1",
+    "numpy": "2.5.4",
+    "plataforma": "Windows-11-10.0.26200-SP0"
+  },
+  "status": "final_refit",
+  "modalidade": "video",
+  "rota": "video_local",
+  "nivel_do_modelo": "Preditor local de vídeo M2: M0 + embeddings de quadros locais (refit; exploratório)",
+  "dataset": {
+    "sha256": "1e8bdbcdd4c116f63c99014c4fa77b57c3aa32e02fd9d91e745ffc38f8066a39",
+    "pasta": "0473653596e3",
+    "sha256_manifesto": "53934dc44bf68b1a00c850f4de58a693af1ba9734b8d9bc9138218ee081ccc8b"
+  },
+  "populacao": {
+    "n_treino": 1500,
+    "n_validacao": 0,
+    "n_linhas": 1500
+  },
+  "retencao": {
+    "dataset_v2": "2026-11-03T23:46:26Z",
+    "base_de_posts": "2026-11-13T02:14:37Z",
+    "extracao_local": "2026-11-03T23:46:26Z",
+    "anotacoes_gemini": "2026-11-03T23:46:26Z",
+    "apagar_ate_utc": "2026-11-03T23:46:26Z",
+    "imposto_por": "anotacoes_gemini",
+    "regra": "o artefato derivado herda o menor prazo entre as fontes"
+  },
+  "limitacoes": [
+    "O modelo foi ajustado com todas as linhas completas da amostra ativa, inclusive as do teste temporal já exposto; a LIM ficou fora. Não existe conjunto independente para este artefato.",
+    "A avaliação descritiva foi feita uma vez no teste temporal já exposto (exploratória / teste reutilizado); a população pode diferir da original por substituição de IDs e por ausência de extração local.",
+    "A cobertura da faixa descreve o procedimento de avaliação e não foi medida neste artefato; não é garantia para vídeos novos.",
+    "Os atributos locais vêm de uma extração offline com modelos pequenos; nenhum deles é validado como medida de qualidade criativa, e embeddings podem codificar estilo do canal.",
+    "Métricas calculadas sobre as linhas do ajuste não são desempenho independente.",
+    "O ganho de erro sobre M0 (histórico e contexto, sem atributos locais) não foi demonstrado: o preditor local é servido sem evidência de melhora sobre a referência de M0.",
+    "Melhora de erro; ordenação não demonstrada: não se afirma que o preditor ordene vídeos melhor que M0.",
+    "O ganho de erro sobre M0 pode refletir a identificação do canal pelos atributos locais, e não o conteúdo do vídeo."
+  ],
+  "semente": 20261015,
+  "alvo": "y_rel = log1p(curtidas) − ref_log; previsão absoluta = ref_log + saída, cortada em 0",
+  "tipo": "modelo_local_q50",
+  "alfa": 0.5
+}

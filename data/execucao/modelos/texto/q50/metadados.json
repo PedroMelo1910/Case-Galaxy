@@ -1,0 +1,187 @@
+{
+  "versao": "1",
+  "sha256_modelo": "211da5c88ec7e376bf37a90ad97b7f83f49569cbda5f80d72ddd96c9ef149fc2",
+  "parametros": {
+    "objective": "quantile",
+    "alpha": 0.5,
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 7,
+    "min_child_samples": 10,
+    "reg_lambda": 1.0,
+    "subsample": 0.8,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.8,
+    "random_state": 20261015,
+    "n_jobs": 4,
+    "deterministic": true,
+    "force_row_wise": true,
+    "verbose": -1
+  },
+  "categoricas_nativas": false,
+  "especificacao": {
+    "escalares": [
+      "hist_ref_log_mediana",
+      "hist_log_media",
+      "hist_mme_log",
+      "hist_n_posts",
+      "hist_ref_setor",
+      "dias_desde_post_anterior",
+      "posts_90d",
+      "dia_semana_local",
+      "hora_local",
+      "leg_n_caracteres_titulo",
+      "leg_n_caracteres_descricao",
+      "leg_n_palavras",
+      "leg_n_hashtags",
+      "leg_n_tags",
+      "leg_n_emojis",
+      "leg_n_links",
+      "leg_tem_descricao"
+    ],
+    "categoricas": [
+      "setor",
+      "tipo_canal"
+    ],
+    "embeddings": {
+      "leg_emb": 8
+    }
+  },
+  "atributos_de_saida": [
+    "hist_ref_log_mediana",
+    "hist_log_media",
+    "hist_mme_log",
+    "hist_n_posts",
+    "hist_ref_setor",
+    "dias_desde_post_anterior",
+    "posts_90d",
+    "dia_semana_local",
+    "hora_local",
+    "leg_n_caracteres_titulo",
+    "leg_n_caracteres_descricao",
+    "leg_n_palavras",
+    "leg_n_hashtags",
+    "leg_n_tags",
+    "leg_n_emojis",
+    "leg_n_links",
+    "leg_tem_descricao",
+    "setor",
+    "tipo_canal",
+    "leg_emb_pc0",
+    "leg_emb_pc1",
+    "leg_emb_pc2",
+    "leg_emb_pc3",
+    "leg_emb_pc4",
+    "leg_emb_pc5",
+    "leg_emb_pc6",
+    "leg_emb_pc7"
+  ],
+  "dependencias": {
+    "python": "3.12.15",
+    "lightgbm": "4.7.0",
+    "scikit-learn": "1.9.1",
+    "numpy": "2.5.4",
+    "plataforma": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.43"
+  },
+  "status": "final_refit",
+  "modalidade": "texto",
+  "nivel_do_modelo": "N2: histórico e legenda (modelo reduzido; refit final)",
+  "dataset": {
+    "sha256": "05fb7d7a5f8f6c725748fe78e0d83a8d3d57f5ee7e081ef1ea51b8f4e63accee",
+    "versao": "1",
+    "entradas": {
+      "base": {
+        "pasta": "snapshot=20261014T021437Z/curadoria=v1",
+        "snapshot_id": "20261014T021437Z",
+        "versao_curadoria": "1",
+        "sha256_manifesto": "479693ef47e4eaf11d56f481a5bb5399b6fcfe33b3878727626fe8fde2664a6e"
+      },
+      "particao": {
+        "arquivo": "particao=v1/particao.json",
+        "versao": "1",
+        "sha256_arquivo": "149392b7af27e6fcbe5c42ce82feeb0bc6046922b39d7f6304f58b3679529096",
+        "sha256_atribuicao": "a8ea2570b656082389f81adc3fc291a4c84956329879776aaee85772a2d71fd8"
+      },
+      "contexto": {
+        "nome": "final",
+        "treino_ate_utc": "2026-09-13T23:29:47Z",
+        "canais_excluidos": [],
+        "blocos_materializados": [
+          "treino",
+          "final"
+        ],
+        "uso_no_contexto": "treino: publicado até treino_ate_utc; intervalo_excluido: do bloco de treino, mas depois do corte; canal_retido: canal excluído do treino; avaliacao: bloco avaliado",
+        "para_quem_consome": "treinar só com uso_no_contexto = treino e avaliar só com avaliacao; linhas com ref_log ou y_rel nulos (referência indisponível ou curtidas ausentes) ficam fora das métricas e são contadas, nunca preenchidas com zero"
+      },
+      "defasagem_dias": 30,
+      "historico": {
+        "sha256": "92e3bd464a12028c0235be3473b77874fa4e37ae70f764f8c5849d73db006100",
+        "sha256_manifesto": "e2ae1868ebd9bd70c75b0b9111ae9ad90101d03f71d8d18a7a8bbd453310f767"
+      },
+      "legenda": {
+        "sha256": "73f721986f094dec63810e430b503cb0eb1afdf4c8486919f72cbfb4f826708b"
+      },
+      "legenda_capa": {
+        "sha256_manifesto": "794b086bb8dfd91053f141706c8578dbe612e689452cbac5a199debd031dac97"
+      },
+      "amostra": {
+        "sha256_lista": "e508df6955f73ff99586ea80f3096379b92c43331366de293f105b3ef876c0ca",
+        "n_planejado": 1500
+      }
+    }
+  },
+  "populacao": {
+    "n_linhas": 1500,
+    "n_canais": 16,
+    "por_setor": {
+      "automotivo": 1227,
+      "beleza": 273
+    },
+    "por_bloco": {
+      "teste_1": 153,
+      "teste_2": 152,
+      "teste_3": 147,
+      "treino": 831,
+      "validacao": 217
+    },
+    "sha256_ids": "c6378d30ca30ef10b41a480358b171ce4abfb9fd1268aa7af75c35387703b01a",
+    "sha256_canais": "7e12066191c38e1a5112950edbc95ddfa0419180d527d6ae93add370fcdad297",
+    "excluidos_por_falta_de_referencia_ou_alvo": {
+      "n": 0,
+      "sha256_ids": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "reconciliacao_do_dataset": {
+      "na_amostra": 1500,
+      "fora_do_n1": 0,
+      "excluidos_por_uso": {},
+      "sem_alvo_ou_referencia": 0,
+      "por_uso": {
+        "treino": 1500
+      },
+      "n_ids": 1500,
+      "sha256_ids": "c6378d30ca30ef10b41a480358b171ce4abfb9fd1268aa7af75c35387703b01a",
+      "nota": "fora_do_n1 são os blocos de teste protegidos, contados só por ID; nenhum rótulo foi lido"
+    },
+    "n_treino": 1500,
+    "n_validacao": 0,
+    "nota": "n_validacao = 0: o refit não tem conjunto de validação nem de avaliação"
+  },
+  "retencao": {
+    "dataset_menor_prazo": "2026-11-13T02:14:37Z",
+    "anotacoes_dos_alvos": "2026-11-03T23:46:26Z",
+    "lim_legenda_capa_e_base": "2026-11-13T02:14:37Z",
+    "apagar_ate_utc": "2026-11-03T23:46:26Z",
+    "regra": "dados derivados herdam o menor prazo; modelo e metadados do pacote devem ser revistos ou apagados com os dados de origem (D-B9)"
+  },
+  "limitacoes": [
+    "Refit final: o modelo foi ajustado com todos os vídeos anotados da amostra congelada, inclusive os 452 vídeos de teste; a LIM ficou fora. Não existe conjunto independente para este artefato.",
+    "A cobertura da faixa é a do procedimento de avaliação (consulta única, 452 vídeos), não foi medida neste artefato e não é garantia para vídeos novos; ficou abaixo dos 80% pretendidos.",
+    "Métricas calculadas sobre os vídeos do ajuste não são desempenho independente e nunca devem ser reportadas como tal.",
+    "Avaliação retrospectiva aproximada: curtidas lidas na coleta, histórico com defasagem de 30 dias, 16 canais, 82% automotivo; a Camada 1 local do TAPI §6.3 não foi atendida (desvio declarado).",
+    "Os limites da faixa são o mínimo e o máximo das três saídas não negativas, com o q50 central (sem CQR)."
+  ],
+  "semente": 20261015,
+  "alvo": "y_rel = log1p(curtidas) − ref_log; previsão absoluta = ref_log + saída, cortada em 0",
+  "tipo": "modelo_final_q50",
+  "alfa": 0.5
+}

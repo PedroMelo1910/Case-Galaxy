@@ -1,10 +1,6 @@
-"""Fluxo fixo do agente em LangGraph (ARQUITETURA §7) e a versão direta que reutiliza os mesmos nós.
-
-Ordem: validar_entrada → extrair_atributos → historico_e_comparaveis → prever_modelo → avaliar_confianca → explicar →
-montar_saida. Um erro previsto (`ErroAgente`) interrompe o fluxo e vira o envelope de erro; os nós seguintes não
-executam. `executar_direto` percorre os mesmos nós em sequência, sem o LangGraph, para provar a equivalência
-numérica entre a chamada direta e o grafo.
-"""
+"""Módulo consolidado. Reúne:
+- Texto do criativo como legenda planejada (ARQUITETURA §7): mapeamento explícito, equivalência e conflito.
+- Fluxo fixo do agente em LangGraph (ARQUITETURA §7) e a versão direta que reutiliza os mesmos nós."""
 
 import itertools
 import logging
@@ -13,28 +9,52 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from src import extracao_legenda as leg
-from src import familias_atributos as fa
-from src.agente import atributos as at
-from src.agente import avisos_gemini as ag
-from src.agente import comparaveis as cmp
-from src.agente import entrada_texto as et
-from src.agente import explicacao as ex
-from src.agente import historico_canal as hc
-from src.agente import previsao as pv
+from src.agente import atributos as at, atributos as rl, comparaveis as cmp, explicacao as ex
 from src.agente.contratos import (
+    aviso,
     Codigo,
-    ErroAgente,
-    PedidoPrever,
     envelope_erro,
     envelope_ok,
+    ErroAgente,
     id_do_proprio_video,
+    Legenda,
+    PedidoPrever,
 )
 from src.agente.servicos import Servicos
-from src.agente.video_local import MAX_DURACAO_S, SondaVideo, sondar_video
-from src.avaliacao import driver_lim as dl
-from src.contratos import Setor
+from src.avaliacao import limiar as dl
+from src.dados import historico as hc
+from src.dados.coleta import Setor
+from src.extracao import texto as leg
+from src.extracao.video_local import MAX_DURACAO_S, sondar_video, SondaVideo
+from src.integracoes import gemini as ag
+from src.modelos import pacote as pv, treino as fa
 
+
+# ──── Texto do criativo como legenda planejada (ARQUITETURA §7): mapeamento explícito, equivalência e conf
+def _composta(legenda: Legenda) -> str:
+    return leg.compor_legenda(legenda.title, legenda.description, None)
+
+
+def legenda_planejada(pedido: PedidoPrever) -> Legenda | None:
+    """Legenda que as extrações usam; para texto, vem de `creative.texto` (com `caption` só se equivalente)."""
+    criativo = pedido.creative
+    if criativo.tipo != "texto":
+        return pedido.caption
+    texto = leg.normalizar_texto(criativo.texto)
+    if not texto:
+        raise ErroAgente(Codigo.ENTRADA_INVALIDA, "O texto do criativo está sem conteúdo.",
+                         {"campos": ["creative.texto"]})
+    informada = pedido.caption
+    if informada is None or not _composta(informada):
+        return Legenda(title=None, description=criativo.texto)
+    if _composta(informada) == texto:
+        return informada
+    raise ErroAgente(Codigo.ENTRADA_INVALIDA,
+                     "O texto do criativo e a legenda (`caption`) divergem; envie só um deles ou textos equivalentes.",
+                     {"campos": ["creative.texto", "caption"]})
+
+
+# ──── Fluxo fixo do agente em LangGraph (ARQUITETURA §7) e a versão direta que reutiliza os mesmos nós.
 logger = logging.getLogger(__name__)
 SETORES_SUPORTADOS = ("beleza", "automotivo")
 ALVO = ("Curtidas acumuladas observadas, em vídeos com pelo menos 30 dias e até cerca de 1 ano de idade; "
@@ -48,7 +68,7 @@ TEMPO_MATERIAL_PUBLICADO = ("A data planejada já passou: o material já foi pub
 TEMPO_MATERIAL_FUTURO = "A data planejada ainda não ocorreu: previsão anterior à publicação."
 INTERPRETACAO_DA_ENTRADA = {"texto": "texto interpretado como legenda planejada",
                             "imagem": "imagem interpretada como capa do criativo planejado"}
-MODALIDADE_DO_FALLBACK = "imagem"  # D-F5: Gemini falhou → N3 (histórico, legenda e capa) com evidência insuficiente
+MODALIDADE_DO_FALLBACK = "imagem"  # sem a anotação do Gemini, o vídeo cai no N3 (histórico, legenda e capa), com evidência insuficiente
 TOLERANCIA_DURACAO_INFORMADA_S = 1
 
 
@@ -67,6 +87,7 @@ class Estado(TypedDict, total=False):
     historico: hc.ResultadoHistorico
     comparaveis: list[dict]
     sonda: SondaVideo
+    rota: str
     fallback: dict
     previsao: dict
     confianca: dict
@@ -75,8 +96,7 @@ class Estado(TypedDict, total=False):
     saida: dict
 
 
-def _aviso(codigo: str, descricao: str, classe: str = "atencao") -> dict:
-    return {"classe": classe, "codigo": codigo, "descricao": descricao}
+_aviso = aviso
 
 
 def validar_entrada(s: Servicos, e: Estado) -> dict:
@@ -85,18 +105,21 @@ def validar_entrada(s: Servicos, e: Estado) -> dict:
         raise ErroAgente(Codigo.ENTRADA_INVALIDA, f"Setor fora do recorte: {p.sector!r}; use beleza ou automotivo.",
                          {"setores_suportados": list(SETORES_SUPORTADOS)})
     s.pacote_para(p.modalidade)
-    et.legenda_planejada(p)  # texto divergente da legenda, ou em branco, é erro de entrada antes de qualquer extração
+    legenda_planejada(p)  # texto divergente da legenda, ou em branco, é erro de entrada antes de qualquer extração
     for caminho in (getattr(p.creative, "arquivo", None), p.thumbnail):
         if caminho is not None and not caminho.is_file():
             raise ErroAgente(Codigo.MIDIA_INVALIDA, f"Arquivo não encontrado: {caminho.name}")
-    saida: dict = {"avisos": _avisos_de_entradas_ignoradas(p)}
+    saida: dict = {"avisos": _avisos_de_entradas_ignoradas(p), "rota": rl.resolver_rota(s, p)}
     if p.modalidade == "video":
-        saida |= _validar_video(p, saida["avisos"])
+        saida |= _validar_video(p, saida["avisos"], saida["rota"])
     return saida
 
 
-def _validar_video(p: PedidoPrever, avisos: list[dict]) -> dict:
-    """Regra do Short (até 180 s, vertical ou quadrado) ANTES de qualquer rede. Arquivo local: a sonda manda na duração."""
+def _validar_video(p: PedidoPrever, avisos: list[dict], rota: str | None = None) -> dict:
+    """Regra do Short (até 180 s, vertical ou quadrado) ANTES de qualquer rede. Arquivo local: a sonda manda na duração.
+
+    A duração do arquivo segue a convenção de cada modelo: o preditor local foi ajustado com a duração inteira por teto
+    da medida do arquivo; a rota Gemini mantém o arredondamento ao inteiro mais próximo."""
     if p.duration_s is not None and p.duration_s > MAX_DURACAO_S:
         raise ErroAgente(Codigo.ENTRADA_INVALIDA,
                          f"A duração informada passa de {MAX_DURACAO_S} s; o agente aceita Shorts de até {MAX_DURACAO_S} s.",
@@ -105,7 +128,7 @@ def _validar_video(p: PedidoPrever, avisos: list[dict]) -> dict:
     if arquivo is None:
         return {}
     sonda = sondar_video(arquivo)
-    duracao = max(1, round(sonda.duracao_s))
+    duracao = max(1, sonda.duracao_inteira_s if rota == rl.ROTA_VIDEO_LOCAL else round(sonda.duracao_s))
     if p.duration_s is not None and abs(p.duration_s - duracao) > TOLERANCIA_DURACAO_INFORMADA_S:
         avisos.append(_aviso("duracao_do_arquivo_prevalece",
                              f"A duração informada ({p.duration_s} s) difere da medida no arquivo ({duracao} s); vale a "
@@ -118,6 +141,8 @@ def _avisos_de_entradas_ignoradas(p: PedidoPrever) -> list[dict]:
     if p.modalidade == "video":
         return []
     avisos = []
+    if p.video_route != "auto":
+        avisos.append(_aviso("rota_de_video_ignorada", "`video_route` só vale para vídeo; foi ignorado.", "info"))
     if p.duration_s is not None:
         avisos.append(_aviso("duracao_ignorada", "A duração informada não é usada pelos modelos de imagem e de texto.",
                              "info"))
@@ -130,13 +155,12 @@ def _avisos_de_entradas_ignoradas(p: PedidoPrever) -> list[dict]:
     return avisos
 
 
-def _colunas_legenda(extracao: dict) -> dict:
-    return {"leg_estado": extracao["estado"], "leg_n_tokens": extracao["n_tokens"],
-            "leg_truncado": extracao["truncado"], **{c: extracao[c] for c in leg.CONTAGENS_LEGENDA},
-            "leg_emb": extracao["vetor"]}
+_colunas_legenda = at.colunas_da_legenda
 
 
 def extrair_atributos(s: Servicos, e: Estado) -> dict:
+    if e.get("rota") == rl.ROTA_VIDEO_LOCAL:
+        return _extrair_video_local(s, e)
     if e["pedido"].modalidade == "video":
         return _extrair_video(s, e)
     return _extrair_reduzida(s, e)
@@ -145,7 +169,7 @@ def extrair_atributos(s: Servicos, e: Estado) -> dict:
 def _extrair_reduzida(s: Servicos, e: Estado) -> dict:
     """Imagem e texto: só a legenda planejada (e a capa, na imagem). Sem Gemini, sem transcrição e sem duração."""
     p, avisos = e["pedido"], list(e.get("avisos", []))
-    legenda = et.legenda_planejada(p)
+    legenda = legenda_planejada(p)
     extr_leg = leg.extrair_legenda(legenda.title if legenda else None, legenda.description if legenda else None,
                                    p.tags, s.codificador_texto)
     if extr_leg["estado"] != "ok":
@@ -187,7 +211,7 @@ def _anotar_video(s: Servicos, e: Estado) -> tuple[dict | None, str, list[dict]]
 
 
 def _fallback_para_imagem(s: Servicos, estado_gemini: str, linha_capa: dict) -> dict:
-    """D-F5 / ARQUITETURA §12: sem os atributos do Gemini, o vídeo é servido pelo modelo de imagem (N3).
+    """Sem os atributos do Gemini, o vídeo da rota Gemini é servido pelo modelo de imagem (N3).
 
     O modelo de imagem só vale com a capa: sem ela (ou sem pacote de imagem) a previsão seria só histórico e legenda
     sob o nome de um modelo de imagem, então é erro explícito, nunca previsão silenciosa.
@@ -226,13 +250,16 @@ def _avisos_de_transcricao(gem: dict) -> list[dict]:
     return avisos
 
 
-def _extrair_video(s: Servicos, e: Estado) -> dict:
-    p, avisos = e["pedido"], list(e.get("avisos", []))
+def _legenda_do_video(s: Servicos, p: PedidoPrever, avisos: list[dict]) -> dict:
     legenda = p.caption
     extr_leg = leg.extrair_legenda(legenda.title if legenda else None, legenda.description if legenda else None,
                                    p.tags, s.codificador_texto)
     if extr_leg["estado"] != "ok":
         avisos.append(_aviso("legenda_incompleta", f"Legenda: {extr_leg['estado']}; o vetor da legenda fica ausente."))
+    return extr_leg
+
+
+def _capa_do_video(s: Servicos, p: PedidoPrever, avisos: list[dict]) -> tuple[dict, str]:
     imagem, origem_capa = at.bytes_da_capa(p, imagens_conferidas=s.imagens_conferidas, baixar=s.baixar_imagem)
     linha_capa = at.extrair_capa(imagem, s.extratores_capa, s.cache_capa)
     if origem_capa == "frame_do_video":
@@ -241,6 +268,32 @@ def _extrair_video(s: Servicos, e: Estado) -> dict:
     if linha_capa["capa_estado_imagem"] != "ok" or any(linha_capa[f"{x}_estado"] != "ok" for x in at.ETAPAS_CAPA):
         avisos.append(_aviso("capa_incompleta", "Capa ausente ou com extrator falho; os atributos da capa ficam "
                                                 "ausentes, sem valor inventado."))
+    return linha_capa, origem_capa
+
+
+def _extrair_video_local(s: Servicos, e: Estado) -> dict:
+    """Rota local: atributos `avl_*` da extração local (com cache) e, só se o modelo os usa, legenda e capa locais."""
+    p, avisos = e["pedido"], list(e.get("avisos", []))
+    colunas_av, extracao, avisos_av = rl.extrair_atributos_audiovisuais(s, e["sonda"])
+    avisos.extend(avisos_av)
+    precisa = rl.necessidades(s.pacote_local)
+    colunas: dict = {}
+    extracao |= {"legenda": "nao_usada", "capa_origem": "nao_usada", "capa": "nao_usada"}
+    if precisa["legenda"]:
+        extr_leg = _legenda_do_video(s, p, avisos)
+        colunas |= _colunas_legenda(extr_leg)
+        extracao["legenda"] = extr_leg["estado"]
+    if precisa["capa"]:
+        linha_capa, origem_capa = _capa_do_video(s, p, avisos)
+        colunas |= linha_capa
+        extracao |= {"capa_origem": origem_capa, "capa": linha_capa["capa_estado_imagem"]}
+    return {"avisos": avisos, "extracao": extracao, "colunas": colunas | colunas_av}
+
+
+def _extrair_video(s: Servicos, e: Estado) -> dict:
+    p, avisos = e["pedido"], list(e.get("avisos", []))
+    extr_leg = _legenda_do_video(s, p, avisos)
+    linha_capa, origem_capa = _capa_do_video(s, p, avisos)
     anotacao, estado_gemini, avisos_fonte = _anotar_video(s, e)
     avisos.extend(avisos_fonte)
     extracao = {"legenda": extr_leg["estado"], "capa_origem": origem_capa, "capa": linha_capa["capa_estado_imagem"],
@@ -263,18 +316,34 @@ def _extrair_video(s: Servicos, e: Estado) -> dict:
 
 def historico_e_comparaveis(s: Servicos, e: Estado) -> dict:
     p = e["pedido"]
-    resultado = hc.obter_historico(p, s.base, consultor=s.consultor_historico, agora=s.relogio())
+    resultado = hc.obter_historico(p, rl.base_da_rota(s, e.get("rota")), consultor=s.consultor_historico,
+                                   agora=s.relogio())
+    if (s.origem_da_colecao == "historico_autorizado_local" and not s.base.posts
+            and resultado.linha["hist_n_posts"] < hc.MIN_POSTS):
+        raise ErroAgente(Codigo.HISTORICO_INDISPONIVEL,
+                         "Envie pelo menos cinco posts com curtidas, publicados até 30 dias antes da data planejada. "
+                         "Esta instalação não inclui uma base setorial de referência.")
     linha = {**resultado.linha, **e["colunas"]}
     linha["tipo_canal"] = resultado.tipo_canal
-    comparaveis = cmp.selecionar(s.colecao_de_referencia, linha, channel_id=p.channel_id, setor=p.sector,
+    colecao = s.colecao_de_referencia
+    origem_comparaveis = s.origem_da_colecao
+    if s.origem_da_colecao == "historico_autorizado_local" and p.channel_stats:
+        from src.dados.execucao import comparaveis_do_pedido
+        colecao = comparaveis_do_pedido(p)
+        origem_comparaveis = "historico_fornecido"
+    canal_comparaveis = p.channel_id or ("__canal_informado__" if p.channel_stats else None)
+    comparaveis = cmp.selecionar(colecao, linha, channel_id=canal_comparaveis, setor=p.sector,
                                  planejada=p.planned_datetime, excluir_video_id=id_do_proprio_video(p),
-                                 origem=s.origem_da_colecao)
+                                 origem=origem_comparaveis)
     return {"linha": linha, "historico": resultado, "comparaveis": comparaveis,
             "avisos": [*e.get("avisos", []), *resultado.avisos]}
 
 
 def pacote_efetivo(s: Servicos, e: Estado):
-    """Pacote que de fato prevê: o da modalidade, ou o de imagem quando o vídeo caiu no fallback para N3."""
+    """Pacote que de fato prevê: o local na rota local; senão o da modalidade, ou o de imagem quando o vídeo caiu no
+    fallback para N3."""
+    if e.get("rota") == rl.ROTA_VIDEO_LOCAL:
+        return s.pacote_local
     return s.pacote_para(MODALIDADE_DO_FALLBACK if e.get("fallback") else e["pedido"].modalidade)
 
 
@@ -290,7 +359,11 @@ def prever_modelo(s: Servicos, e: Estado) -> dict:
 
 
 def confianca_estatistica(pacote, pred: dict) -> dict:
-    """Regra de largura (D-F2 b): só com limiar vinculado a ESTE pacote (vídeo final); senão, não se aplica."""
+    """Regra de largura: só com limiar vinculado a ESTE pacote (vídeo final); senão, não se aplica."""
+    if pacote.limiar is None and pacote.eh_local:
+        return {"aplicavel": False, "estado": "indisponivel",
+                "motivo": "confiança insuficiente/indisponível: o preditor local não tem limiar de largura calculado "
+                          "para este artefato, e o limiar de outro pacote não é transferido"}
     if pacote.limiar is None:
         return {"aplicavel": False, "motivo": "sem limiar de largura vinculado a este pacote (imagem, texto, fallback "
                                               "ou pacote sem amostra LIM)"}
@@ -315,7 +388,21 @@ def _texto_do_limiar(c: dict) -> str:
     return base + " Não garante cobertura nem desempenho."
 
 
+def _avisos_do_modelo_local(pacote) -> list[dict]:
+    avaliacao = pacote.registro.get("avaliacao") or {}
+    rotulo = avaliacao.get("rotulo") or "sem avaliação registrada"
+    avisos = [_aviso("modelo_local_sem_gemini",
+                   "Preditor local de vídeo: usa atributos audiovisuais extraídos neste equipamento (quadros, áudio, "
+                   "fala, texto na tela e objetos), sem Gemini e sem rede. Avaliação do artefato: " + rotulo + "; não é "
+                   "um teste independente e não garante desempenho em vídeos novos.", "info")]
+    avisos += [_aviso("aviso_obrigatorio_do_pacote", texto)  # o que a seleção do preditor não demonstrou, gravado no pacote
+               for texto in pacote.registro.get("avisos_obrigatorios", [])]
+    return avisos
+
+
 def _avisos_do_modelo(pacote) -> list[dict]:
+    if pacote.eh_local:
+        return _avisos_do_modelo_local(pacote)
     if pacote.eh_final:
         avisos = [_aviso("modelo_refit_final", "Modelo retreinado com todos os vídeos anotados da amostra (inclusive os "
                          "de teste), configuração A fixa, sem busca nem calibração. A avaliação final descreve o "
@@ -339,7 +426,9 @@ def avaliar_confianca(s: Servicos, e: Estado) -> dict:
     avisos.extend(_avisos_do_modelo(pacote))
     avisos.append(_aviso("faixa_sem_cobertura_suficiente", pacote.declaracao_faixa["aviso"]))
     confianca = confianca_estatistica(pacote, pred)
-    if not confianca["aplicavel"]:
+    if not confianca["aplicavel"] and confianca.get("estado") == "indisponivel":
+        avisos.append(_aviso("confianca_indisponivel", "Confiança insuficiente/indisponível: " + confianca["motivo"] + "."))
+    elif not confianca["aplicavel"]:
         avisos.append(_aviso("sem_sinal_de_confianca_da_lim", "Não há limiar estatístico de confiança medido na amostra "
                                                                "LIM; nenhum sinal de confiança é afirmado.", "info"))
     else:
@@ -411,11 +500,36 @@ def montar_saida(s: Servicos, e: Estado) -> dict:
         saida |= _campos_do_fallback(e["fallback"])
     elif e["confianca"].get("sinalizada"):
         saida |= _campos_da_baixa_confianca(e["confianca"])
+    elif e["confianca"].get("estado") == "indisponivel":
+        saida |= _campos_da_confianca_indisponivel(e["confianca"])
+    saida["route"] = _bloco_route(s, e, pacote)
+    if e.get("rota") == rl.ROTA_VIDEO_LOCAL:
+        saida["explanation_label"] = (rl.EXPLICACAO_REDIGIDA if expl["fonte"] == "llm"
+                                      else rl.EXPLICACAO_DETERMINISTICA)
     return {"saida": saida}
 
 
+def _bloco_route(s: Servicos, e: Estado, pacote) -> dict:
+    """Bloco `route`: a rota que produziu esta resposta, a versão do modelo e se houve dependência de rede."""
+    modalidade = e["pedido"].modalidade
+    rota = e.get("rota") or (rl.ROTA_VIDEO_GEMINI if modalidade == "video" else modalidade)
+    if e.get("fallback"):
+        rota = rl.ROTA_VIDEO_GEMINI_FALLBACK
+    offline = not rl.usou_rede(rota=rota, extracao=e["extracao"], origem_historico=getattr(e["historico"], "origem", None),
+                               explicacao_fonte=e["explicacao"]["fonte"],
+                               explicador_configurado=s.subagente is not None)
+    return rl.descrever_rota(rota, versao_do_modelo=pacote.versao, offline=offline)
+
+
+def _campos_da_confianca_indisponivel(c: dict) -> dict:
+    """Preditor local sem limiar para o próprio artefato: a confiança é declarada indisponível, não inventada."""
+    return {"confidence_flag": "indisponivel",
+            "confidence_reasons": [{"classe": "limiar_ausente", "codigo": "sem_limiar_do_artefato",
+                                    "descricao": c["motivo"]}]}
+
+
 def _campos_da_baixa_confianca(c: dict) -> dict:
-    """Largura acima do limiar vinculado: classe `regra_estatistica` (D-F2 b), com a ressalva de validade presumida."""
+    """Largura acima do limiar vinculado: classe `regra_estatistica`, com a ressalva de validade presumida."""
     motivo = (f"baixa confiança estatística: largura {c['largura_log']:.3f} acima do limiar {c['limiar_log']:.3f} "
               "(validade presumida e declarada neste pacote)")
     return {"confidence_flag": "baixa",
@@ -424,7 +538,7 @@ def _campos_da_baixa_confianca(c: dict) -> dict:
 
 
 def _campos_do_fallback(fallback: dict) -> dict:
-    """Só no fallback: o que mudou de modelo e por quê, com a baixa confiança da ARQUITETURA §9.3 (D-F2)."""
+    """Só no fallback: o que mudou de modelo e por quê, com a baixa confiança da ARQUITETURA §9.3."""
     motivo = f"sem os atributos do Gemini ({fallback['motivo']}): previsão pelo modelo de imagem, sem o vídeo"
     return {"fallback": fallback, "confidence_flag": "baixa",
             "confidence_reasons": [{"classe": "evidencia_insuficiente", "codigo": "sem_vlm", "descricao": motivo}]}

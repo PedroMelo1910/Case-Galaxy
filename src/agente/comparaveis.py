@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-from src.contratos import url_do_video
+from src.dados.coleta import url_do_video
 
 USOS_PERMITIDOS = ("treino", "avaliacao")
 DIAS_MATURIDADE = 30

@@ -13,6 +13,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 MAX_CRIATIVOS_ORDENAR = 5
 MIN_CRIATIVOS_ORDENAR = 2
+MAX_BYTES_IMAGEM = 20_000_000  # limite de entrada de imagem (capa); usado pelo agente, pela miniatura e pela fronteira do MCP
 
 
 _ID_VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -45,6 +46,7 @@ class Codigo(StrEnum):
     CANAIS_DIFERENTES = "CANAIS_DIFERENTES"
     MODALIDADES_DIFERENTES = "MODALIDADES_DIFERENTES"
     NIVEIS_DIFERENTES = "NIVEIS_DIFERENTES"
+    ROTAS_DIFERENTES = "ROTAS_DIFERENTES"
     HISTORICO_INDISPONIVEL = "HISTORICO_INDISPONIVEL"
     MODELO_INDISPONIVEL = "MODELO_INDISPONIVEL"
     COTA_ESGOTADA = "COTA_ESGOTADA"
@@ -152,11 +154,26 @@ class PedidoPrever(_Modelo):
         description="ID de 11 caracteres do YouTube do próprio criativo, quando ele já existe no canal (opcional). "
                     "Vem da URL em vídeos com `url`; para imagem, texto e vídeo em arquivo, informe-o para que o "
                     "agente exclua o criativo do histórico antes da referência e da cadência.")
+    video_route: Literal["auto", "local", "gemini"] = Field(
+        default="auto",
+        description="Rota de previsão do vídeo (opcional). `auto`: preditor local quando o criativo é um ARQUIVO de "
+                    "vídeo e há preditor local ativo; vídeo por URL pública usa a rota Gemini. `local`: exige arquivo "
+                    "de vídeo e preditor local ativo (offline, sem Gemini). `gemini`: anotação do Gemini (URL pública "
+                    "ou arquivo enviado à Files API). Imagem e texto ignoram o campo.")
 
     @model_validator(mode="after")
     def _canal(self) -> PedidoPrever:
         if self.channel_id is None and self.channel_stats is None:
             raise ValueError("informe `channel_id` ou `channel_stats`")
+        return self
+
+    @model_validator(mode="after")
+    def _rota_local_exige_arquivo(self) -> PedidoPrever:
+        if self.video_route == "local" and getattr(self.creative, "arquivo", None) is None:
+            raise ValueError("`video_route = local` exige um criativo de vídeo em `arquivo`; vídeo por URL pública "
+                             "usa a rota gemini")
+        if self.video_route == "local" and self.creative.tipo != "video":
+            raise ValueError("`video_route = local` vale só para vídeo")
         return self
 
     @model_validator(mode="after")
@@ -183,9 +200,20 @@ class PedidoOrdenar(_Modelo):
     creatives: tuple[PedidoPrever, ...]
 
 
+class PedidoExtrairAudiovisual(_Modelo):
+    """Extração audiovisual local de um arquivo de vídeo: só o arquivo. Nada é previsto; a saída são atributos."""
+
+    arquivo: Path
+
+
 ORIGEM_SNAPSHOT = "historico_do_snapshot"
 ORIGEM_FORNECIDO = "historico_fornecido"
 ORIGEM_CONSULTA_ATUAL = "consulta_atual"
+
+
+def aviso(codigo: str, descricao: str, classe: str = "atencao") -> dict:
+    """Aviso estruturado da resposta: `{classe, codigo, descricao}`."""
+    return {"classe": classe, "codigo": codigo, "descricao": descricao}
 
 
 def envelope_ok(dados: dict) -> dict:

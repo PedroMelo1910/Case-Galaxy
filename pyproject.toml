@@ -18,17 +18,31 @@ dependencies = [
     "torch",
     "torchvision",
     "transformers",
+    # Camada audiovisual local (TAPI §6.3, camada 1), CPU e sem API: PyAV (decodifica vídeo e áudio com as próprias
+    # bibliotecas FFmpeg do wheel, sem ffmpeg no PATH), faster-whisper (fala), PySceneDetect (cortes) e
+    # onnxruntime (YOLOX). Detector YOLOX e não Ultralytics: o pacote `ultralytics` é AGPL-3.0.
+    "av>=19.0.1",
+    "faster-whisper>=1.2.1",
+    "scenedetect>=0.7.2",
+    "onnxruntime>=1.31.0",
     "scikit-learn>=1.9.1",
     "lightgbm>=4.7.0",
     "langgraph>=1.2.15",
     "mcp>=2.3,<3",
+    # Windows nao fornece a base IANA usada por zoneinfo (hora local e cotas).
+    "tzdata; sys_platform == 'win32'",
+    "streamlit>=1.40",
 ]
 
 # Pontos de entrada para quem só quer testar o software (sem reconstruir o dataset de treino).
 [project.scripts]
-casegalaxy-mcp = "src.agente.servidor_mcp:main"
+casegalaxy-mcp = "src.integracoes.mcp:main"
 casegalaxy-demo = "src.demonstracao:main"
-casegalaxy-pacote-servido = "src.agente.manifesto_servido:main"
+casegalaxy-pacote-servido = "src.modelos.pacote:main"
+casegalaxy-extrair-av = "src.extracao.pipeline:main"
+casegalaxy-preparar-av = "src.extracao.pipeline:main_preparar"
+casegalaxy-interface = "src.interface_web.lancar:main"
+casegalaxy-demo-local = "src.demonstracao:main_demonstracao_local"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13"]
@@ -38,6 +52,10 @@ build-backend = "uv_build"
 # O cache do uv fica no disco Linux e o .venv em /mnt/c (sistemas de arquivos
 # diferentes): hardlink é impossível, então a cópia é declarada explicitamente.
 link-mode = "copy"
+# PySceneDetect 0.7.2 exige `opencv-python` (com interface gráfica). O projeto usa só `opencv-python-headless`, e os dois
+# instalam o mesmo módulo `cv2`: conviver sobrescreve arquivos. A exigência é neutralizada com um marcador que nunca é
+# verdadeiro; o PySceneDetect usa o `cv2` headless já instalado (verificado em VERIFICACOES/video_local/).
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
 
 # Torch e torchvision só da distribuição para CPU (sem bibliotecas CUDA de vários GB).
 [[tool.uv.index]]

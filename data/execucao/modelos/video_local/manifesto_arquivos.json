@@ -1,0 +1,14 @@
+{
+  "arquivos": {
+    "pacote.json": "9b333aad9f59c2169c2769a48fe4793d478b3ea606b38c2169915797e78ea44a",
+    "q10/metadados.json": "430181319be78cff6b196d009e933b79c7cd4e9147f356a49360c6698dfd1b93",
+    "q10/modelo.joblib": "aaa97862b9fde4c2ebf84c70a480a0b7b10272da4621ad0957f002cac23d7bac",
+    "q10/preprocessador.joblib": "f8e0f9ce481f61972765706187cd9f65c8ad19664fd8cea773adfd95ac576acd",
+    "q50/metadados.json": "0e93f1dd57a74e393cce0d749825f309c53a0a5e060439e4c816c7dae62e1c4b",
+    "q50/modelo.joblib": "080f5626f7046c42cf5bdbe3640a1ed625c10a882c29a327cf4cac3087652705",
+    "q50/preprocessador.joblib": "f8e0f9ce481f61972765706187cd9f65c8ad19664fd8cea773adfd95ac576acd",
+    "q90/metadados.json": "f84265d7aca08b5ea0189f1bdb423a33162f02304cec917651181715d5936783",
+    "q90/modelo.joblib": "3ee0c35ab73b69201cae759c047757b3a4d430f6a56c0f4f84a19139739eec4a",
+    "q90/preprocessador.joblib": "f8e0f9ce481f61972765706187cd9f65c8ad19664fd8cea773adfd95ac576acd"
+  }
+}

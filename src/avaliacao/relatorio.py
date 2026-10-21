@@ -18,22 +18,19 @@ from pathlib import Path
 import numpy as np
 import scipy
 
-from src import dataset_desenvolvimento as ds
-from src import faixa_previsao as fp
-from src import modelo_desenvolvimento as md
-from src.avaliacao import baseline_inscritos as bi
-from src.avaliacao import bootstrap as bs
-from src.avaliacao import cobertura_setor as cs
-from src.avaliacao import declaracao_faixa as dcl
-from src.avaliacao import desenvolvimento as dv
-from src.avaliacao import diagnosticos as dg
+from src.dados import dataset as ds
+from src.modelos import treino as fp
+from src.modelos import treino as md
+from src.avaliacao import experimentos as bi
+from src.avaliacao import metricas as bs
+from src.avaliacao import experimentos as cs
+from src.avaliacao import limiar as dcl
+from src.avaliacao import experimentos as dv
+from src.avaliacao import experimentos as dg
+from src.proveniencia import sha256_arquivo as _sha
 
 BORDAS_IDADE = (0, 30, 60, 90, 120, 150, 180, 240, 300, 370)  # os blocos de teste têm 31 a 118 dias na coleta
 BORDAS_HISTORICO = (0, 5, 10, 20, 21)
-
-
-def _sha(arquivo: Path) -> str:
-    return hashlib.sha256(Path(arquivo).read_bytes()).hexdigest()
 
 
 def prever_pacote(linhas: Sequence[dict], q10: md.ModeloTreinado, q50: md.ModeloTreinado,

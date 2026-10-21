@@ -1,169 +1,214 @@
-# CaseGalaxy: agente preditivo de curtidas em YouTube Shorts
+# CaseGalaxy
 
-Projeto individual do Inteli Academy x Galaxies. Dado um criativo (vídeo, imagem de capa ou texto de legenda) de um canal de **beleza** ou **automotivo**, o agente devolve a quantidade de curtidas que o Short tende a acumular, uma faixa de 80% pretendidos, a comparação com o histórico do canal, os fatores que mais pesaram, avisos de baixa confiança e a versão e a cobertura do modelo que respondeu. Também ordena de 2 a 5 criativos do **mesmo canal**.
+Agente preditivo para analisar criativos de YouTube Shorts e estimar seu potencial de curtidas considerando o histórico do canal. Projeto acadêmico Inteli Academy × Galaxies, com foco nos setores de beleza e automotivo.
 
-> **Leia antes de usar os números.** O modelo vence a média histórica aritmética, mas contra a mediana e a média móvel exponencial a vantagem em erro é pequena ou inconclusiva. A faixa de 80% cobriu **64,2%** dos vídeos de teste (não 80%) e não tem cobertura garantida. A base é pequena e concentrada (16 canais, 82% automotivo). A Camada 1 local do TAPI §6.3 **não é atendida** (desvio declarado e não resolvido). Não há promessa de percentual de acerto nem de conformidade integral ao TAPI. Detalhes em [Limitações](#8-limitações).
+Pela função Python ou pelo MCP, o usuário envia um vídeo, uma capa ou uma legenda planejada, informa o contexto do canal e recebe uma estimativa central, uma faixa de previsão, a comparação com a referência histórica e uma explicação dos fatores associados ao resultado. Também pode comparar de dois a cinco criativos do mesmo canal.
 
-Índice: [1 Problema](#1-problema-e-recorte) · [2 Base](#2-base) · [3 Arquitetura](#3-arquitetura) · [4 Instalação e execução](#4-instalação-e-execução) · [5 Modelos](#5-modelos-e-configurações) · [6 Metodologia](#6-metodologia) · [7 Resultados](#7-resultados) · [8 Limitações](#8-limitações) · [9 Evolução](#9-evolução)
+> A previsão apoia uma decisão; não garante o resultado da publicação. A faixa tem cobertura pretendida de 80%, mas cobriu 62,2% no procedimento de avaliação da rota local. O ganho para escolher criativos do mesmo canal ainda não foi demonstrado de forma consistente no desenvolvimento.
 
-## 1. Problema e recorte
+## Índice
 
-- **Pergunta:** quantas curtidas um Short de uma marca ou criador tende a acumular, e entre dois criativos do mesmo canal, qual tende a ir melhor?
-- **Alvo:** `log(1 + curtidas)` de Shorts com pelo menos 30 dias, **relativo ao canal**: o que o vídeo faz acima ou abaixo da mediana dos últimos 20 posts do canal publicados até 30 dias antes. A saída principal para decisão é essa razão e o ranking dentro do canal. O valor absoluto é uma estimativa e não uma previsão exata aos 30 dias.
-- **Recorte:** Shorts (até 180 s, vertical ou quadrado), canais do Brasil, setores beleza e automotivo (outros setores, como moda, são recusados com erro explícito). Sem tela, sem mídia paga, sem público específico de cliente, sem previsão de visualizações.
-- **Entradas aceitas:** URL pública de Short do YouTube, arquivo de vídeo local, imagem (interpretada como a capa planejada) e texto (interpretado como a legenda planejada). Cada uma é atendida pelo seu próprio modelo (seção 5).
-- **O que não afirma:** causalidade. Os fatores mostrados descrevem o modelo, não o efeito de mudar o criativo.
+- [O que o projeto entrega](#o-que-o-projeto-entrega)
+- [Como usar](#como-usar)
+- [Demonstração](#demonstracao-do-projeto)
+- [Fluxo completo](#fluxo-completo)
+- [Arquitetura de software](#arquitetura-de-software)
+- [Dados e modelo preditivo](#dados-e-modelo-preditivo)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Instalação do zero](#instalacao-do-zero)
+- [Testes e avaliações](#testes-e-avaliacoes)
 
-## 2. Base
+Os contratos, procedimentos de reprodução, resultados completos, retenção e licenças estão na [documentação técnica](docs/DOCUMENTACAO.md).
 
-| | |
-|---|---|
-| Origem | YouTube Data API v3, coleta própria e única (snapshot `20261014T021437Z`, coletado em 2026-10-14T02:14:37Z). Nenhum vídeo ou áudio é baixado do YouTube. |
-| Canais | 16 elegíveis (12 automotivo, 4 beleza), de uma lista de 30 canais aprovados pela identidade (site oficial liga ao canal) e filtrados por país Brasil (três exceções documentadas para canais de atuação brasileira). |
-| Período | Alvos: Shorts publicados nos 365 dias até a coleta, menos os 30 últimos dias. Histórico: mais 183 dias anteriores. Amostra LIM (menos de 30 dias): só para um limiar de largura da faixa, sem rótulos. |
-| Anotados | 1.500 vídeos-alvo (automotivo 1.227, beleza 273) anotados pelo Gemini, mais 100 da LIM. |
-| Rótulo | Curtidas lidas **na data da coleta** (avaliação retrospectiva aproximada; ver Limitações). |
-| Licença e termos | Dados da API do YouTube e saídas do Gemini: sem licença de redistribuição presumida. Retenção de **30 dias** (menor prazo desta entrega: **2026-11-03T23:46:26Z**). Ver [docs/dados_e_retencao.md](docs/dados_e_retencao.md). |
-| Limites | 16 canais (muito abaixo da meta de 60+ do briefing, declarado); 82% automotivo; beleza com 4 canais; uma coleta, sem recoleta. |
+## O que o projeto entrega
 
-O que a distribuição leva e por quanto tempo está em [docs/dados_e_retencao.md](docs/dados_e_retencao.md). **Pedro, autor, pode estender os prazos se a regra de origem permitir; nenhuma permissão indefinida é presumida.**
+- Previsão de curtidas com valor central e limites inferior e superior.
+- Comparação com a referência histórica do canal e ranking de dois a cinco criativos compatíveis.
+- Rota local de vídeo com extração em CPU e previsão sem Gemini nem chamadas de rede no modo offline.
+- Rota Gemini preservada para análise de vídeo, além de modelos próprios para imagem e texto.
+- Explicações SHAP, avisos de evidência limitada e identificação da rota e da versão do modelo.
+- Interface Streamlit, função Python e servidor MCP usando a mesma lógica.
+- Execução sobre vídeo e histórico informados pelo usuário; os modelos treinados já acompanham o clone.
+- Pacotes versionados com hashes, configuração de treino e linhagem dos dados.
 
-## 3. Arquitetura
+## Como usar
 
-```
-criativo ─► MCP (stdio) ─► prever / ordenar ─► grafo fixo (LangGraph)
-                                                 validar_entrada
-                                                 1 extrair_atributos   (Gemini observa; capa e legenda locais)
-                                                 2 historico_e_comparaveis (YouTube/base; 3 do canal + 2 do setor)
-                                                 3 prever_modelo       (LightGBM q10/q50/q90, um modelo por modalidade)
-                                                 avaliar_confianca
-                                                 4 explicar            (TreeSHAP + redator + validador)
-                                                 montar_saida          (5 ordenar: só mesmo canal)
-```
+1. Clone o repositório e prepare o ambiente conforme as instruções abaixo; os modelos treinados já acompanham o código.
+2. Abra a interface para analisar um arquivo de vídeo. Imagem, texto, URL pública e ranking são acessados pela função Python ou pelo MCP.
+3. Informe o setor, a data planejada e o contexto do canal. Forneça o histórico próprio por CSV ou use um contexto local autorizado.
+4. Envie o vídeo. A rota automática utiliza o preditor local quando ele está ativo; título e legenda são opcionais.
+5. Clique em **Analisar** e consulte a previsão, a referência do canal, a faixa, as contribuições e os avisos.
 
-- **O Gemini observa, o LightGBM calcula, o LangGraph organiza, o SHAP e o redator explicam, o MCP expõe.** Todo número vem de modelo salvo; o único nó com LLM só redige a explicação e o validador reprova frases com números inventados.
-- Uma função (`from src.agente.api import prever, ordenar`) e o servidor MCP chamam a mesma lógica; os testes conferem que dão os mesmos números.
-- Falhas viram erro ou aviso tipado, nunca previsão calada: se o Gemini falha, o vídeo cai no **modelo de imagem** (a saída diz isso, traz a versão e a cobertura do modelo de imagem e baixa confiança). Detalhes em [docs/arquitetura.md](docs/arquitetura.md).
+Para comparar alternativas pela API Python ou pelo MCP, mantenha o mesmo canal, modalidade e rota. O formulário web atual analisa um vídeo por vez e não oferece ranking, imagem, texto ou entrada de URL. O ranking ordena estimativas do modelo; não equivale a um teste A/B de publicação. O modo online é opcional e precisa de configuração explícita; a experiência offline não exige chaves de API.
 
-**Tecnologias e por quê** (o TAPI §8 diz que nada é obrigatório e que a escolha deve ser justificada):
+<a id="demonstracao-do-projeto"></a>
+## Demonstração
 
-| Escolha | Motivo |
-|---|---|
-| Python 3.12 com `uv` e `uv.lock` | ambiente reproduzível e versões fixadas; torch só na versão CPU |
-| LightGBM (quantis 0,1/0,5/0,9) | dados tabulares e pequenos, ausências tratadas nativamente, treino determinístico em CPU, intervalo por quantis sem calibração extra, TreeSHAP embutido (`pred_contrib`, o pacote `shap` não é usado) |
-| scikit-learn | pré-processamento e PCA dos embeddings, ajustados só no treino |
-| Gemini (`gemini-3.5-flash-lite`, URL pública) | lê o vídeo sem baixá-lo do YouTube e devolve rubrica e transcrição; substitui o Whisper (desvio declarado) |
-| e5-small multilíngue, CLIP ViT-B/32, EasyOCR, MediaPipe, OpenCV | atributos locais de legenda e capa, em CPU |
-| LangGraph | grafo fixo e testável (não é agente livre) |
-| MCP SDK (stdio) | a superfície que o agente da Galaxies consome |
-| Pydantic | contratos de entrada e saída |
-| Parquet/JSON com SHA-256 | rastreabilidade (ver "Registro de experimentos" na seção 6) |
+A interface executa o modelo real sobre o vídeo enviado. Para testar, use um vídeo próprio e o histórico do seu canal, colado ou enviado como CSV. O arquivo `exemplos/historico_ficticio.csv` serve apenas para aprender o formato: seus números são inventados e não representam um canal real.
 
-Não usados: MLflow, faster-whisper, SigLIP 2, YOLO, PySceneDetect, conformal/CQR, RAG e banco vetorial, tela.
+Também é possível executar no Windows:
 
-## 4. Instalação e execução
-
-Pré-requisitos: Linux (testado em Ubuntu sob WSL2), [`uv`](https://docs.astral.sh/uv/), Python 3.12 (o `uv` instala), cerca de 3 GB de disco para o ambiente e 1,2 GB para os pesos dos codificadores, e as bibliotecas do sistema `libgomp1` (LightGBM) e `libgles2`/`libegl1` (MediaPipe) (nomes Debian/Ubuntu, **não verificados em máquina limpa**). Se faltarem, `uv run casegalaxy-demo --verificar-ambiente` diz; uma pasta com as `.so` pode ser indicada por `LD_LIBRARY_PATH`.
-
-Os comandos abaixo valem a partir da pasta `Entrega Galaxy/` e não dependem de caminho absoluto do autor.
-
-```bash
-# 1. ambiente travado
-uv sync --locked
-
-# 2. chaves (opcionais offline; só o modo online do MCP e a coleta as usam)
-cp .env.example .env        # preencha YOUTUBE_API_KEY e GEMINI_API_KEY apenas se for usar o modo online
-
-# 3. distribuição de modelos e dados de serviço (arquivo fornecido pelo autor, fora do Git)
-tar -xzf casegalaxy_distribuicao_v1.tar.gz casegalaxy_distribuicao_v1/verificar_distribuicao.py
-uv run python casegalaxy_distribuicao_v1/verificar_distribuicao.py instalar casegalaxy_distribuicao_v1.tar.gz --destino .
-
-# 4. pesos dos codificadores (não vão na distribuição)
-uv run casegalaxy-demo --verificar-ambiente         # somente leitura: lista o que falta, com tamanho e SHA-256
-uv run casegalaxy-demo --baixar-codificadores       # opt-in, só o que falta; pede rede
-
-# 5. demonstração offline (6 criativos do de-para, sem rede)
-uv run casegalaxy-demo
-uv run casegalaxy-demo --mostrar-salvas             # plano B: relê as respostas salvas, sem carregar modelos
-
-# 6. servidor MCP (stdio; offline por padrão)
-uv run casegalaxy-mcp
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 prever-video -Video C:\caminho\video.mp4 -Canal meu_canal -Setor beleza -TipoCanal marca -Historico .\exemplos\historico_ficticio.csv
 ```
 
-### Chaves de API
+Substitua o CSV fictício pelo histórico autorizado do canal para uma análise de uso real. Os modelos treinados acompanham o repositório; não é necessário baixar os vídeos de treino nem retreinar. O ranking, imagem/texto e a rota Gemini continuam disponíveis pela API Python e pelo MCP; consulte a [documentação técnica](docs/DOCUMENTACAO.md#integracao).
 
-O `.env` (ignorado pelo Git) aceita `YOUTUBE_API_KEY` (Google Cloud, YouTube Data API v3, cota de 10.000 unidades por dia) e `GEMINI_API_KEY` (Google AI Studio, nível gratuito: 15 requisições por minuto, 500 por dia e 28.800 s de vídeo por dia, premissa operacional contada pelo dia do Pacífico). O servidor MCP só liga o modo online com `CASEGALAXY_MCP_ONLINE=1` e `CASEGALAXY_MCP_LIVRO=<arquivo do livro de consumo>`; tetos por execução em [docs/uso.md](docs/uso.md). **A demonstração nunca faz chamada online.**
+## Fluxo completo
 
-### Offline e online
+O caminho abaixo mostra uma previsão, desde a entrada até a resposta apresentada:
 
-Offline, o agente responde com modelos, base curada e caches locais; vídeo por URL só tem os atributos do Gemini se a anotação estiver no cache (a distribuição leva as anotações dos 6 vídeos do de-para, não as dos 1.500 alvos). Sem anotação, o vídeo cai no modelo de imagem se houver capa; sem anotação e sem capa dá erro, para não responder só com o histórico. Online, o servidor anota vídeos novos por URL (consome cota), envia vídeo local pela Files API e consulta o histórico do canal.
-- **Reproduzir o treino** (precisa de chaves, de vários dias de cota do Gemini e gera outra base): [docs/reproduzir_o_treino.md](docs/reproduzir_o_treino.md). Os testes e as verificações de desenvolvimento ficam fora deste repositório e não são entregues.
-- Guia de uso, formatos de pedido e resposta, MCP e exemplos: [docs/uso.md](docs/uso.md). Demonstração: [docs/demonstracao.md](docs/demonstracao.md).
+```mermaid
+flowchart TD
+    INICIO(["Criativo e contexto do canal"]) --> VALIDAR["Validar entrada e selecionar a rota"]
+    VALIDAR --> EXTRAIR["Extrair atributos ou recuperar cache compatível"]
+    EXTRAIR --> HISTORICO["Construir histórico permitido e buscar comparáveis"]
+    HISTORICO --> PREVER["Modelo treinado: previsão central e faixa"]
+    PREVER --> CONFIANCA["Avaliar incerteza e sinalizar limitações"]
+    CONFIANCA --> EXPLICAR["Explicar os fatores SHAP"]
+    EXPLICAR --> SAIDA(["Curtidas estimadas, faixa, referência e explicação"])
+```
 
-## 5. Modelos e configurações
+A interface recebe um arquivo de vídeo por análise. A função Python e o MCP também aceitam imagem, texto e URL pública, além do pedido de ranking. Para ordenar de dois a cinco criativos compatíveis, o agente percorre esse fluxo para cada item e ordena as previsões centrais.
 
-Versão ativa: **`final=v1`** (manifesto `data/models/pacote_servido=v1.json`), refit final com os 1.500 vídeos-alvo anotados (LIM fora). LightGBM, configuração A fixa: 300 árvores, taxa de aprendizado 0,05, 7 folhas, `min_child_samples` 10, semente 20261015. Sem busca nem calibração no refit.
+O LightGBM calcula os números. No modo online, um LLM pode redigir a explicação, que é validada contra os valores calculados; no modo offline, o texto é determinístico. Nenhuma explicação altera a previsão.
 
-| Modalidade | Modelo (nome comum) | Versão servida | Atributos |
-|---|---|---|---|
-| vídeo | modelo completo de vídeo (N4) | `final=v1/video-6bb801f43992-c62b81db` | histórico, legenda, capa, rubrica e transcrição do Gemini, duração |
-| imagem | modelo de imagem (N3) | `final=v1/imagem-361551e0e0f7-c62b81db` | histórico, legenda, capa (também é o modelo de contingência do vídeo) |
-| texto | modelo de texto (N2) | `final=v1/texto-05fb7d7a5f8f-c62b81db` | histórico e legenda |
+## Arquitetura de software
 
-- Cada resposta traz **a versão e a cobertura do próprio modelo**. A cobertura exibida é a do **procedimento de avaliação** (não foi medida no artefato servido, porque ele foi retreinado com todos os dados) e **não é garantida**: modelo completo de vídeo 64,2%, imagem 63,1%, texto 63,1%, para um nível pretendido de 80%.
-- **Faixa:** o q50 é sempre o valor central; os limites são o mínimo e o máximo das três saídas (q10, q50, q90), não negativas.
-- **Baixa confiança:** imagem, texto e contingência sempre avisam "evidência limitada". No vídeo há também uma regra pela largura da faixa: limiar **2,9733** em log (percentil 80 das larguras na LIM, n = 100), vinculado ao pacote servido. A validade dessa regra no pacote servido é **presumida**; no pacote de desenvolvimento o diagnóstico foi **inconclusivo** (erro médio 2,283 nos sinalizados contra 0,894; IC 95% da diferença de −0,148 a 2,215). A regra não garante cobertura nem desempenho.
-- **Rollback** do pacote ativo: `uv run casegalaxy-pacote-servido reverter --motivo "..."` (a distribuição não leva os pacotes de desenvolvimento, então só funciona na máquina do autor).
+O modelo é treinado previamente. Durante o uso, a aplicação carrega o pacote aprovado e executa a previsão:
 
-## 6. Metodologia
+```mermaid
+flowchart TD
+    subgraph PREPARO["Preparação e aprendizado offline"]
+        DADOS["Dados: coleta, curadoria e partições"] --> ATRIBUTOS["Extração de atributos"]
+        ATRIBUTOS --> TREINO["Treino e avaliação"]
+        TREINO --> PACOTE[("Pacote de modelos versionado")]
+    end
 
-- **Partição temporal por contagem, em ordem de publicação:** 55% treino, 15% validação, 30% teste em três sub-blocos, com intervalo de 30 dias antes de cada bloco avaliado. Canais não vistos: 30% dos canais retidos, em três sorteios. Divisão aleatória nunca é resultado.
-- **Contra o vazamento:** estatísticas do próprio vídeo nunca entram; inscritos e totais do canal ficam fora; histórico só com posts até 30 dias antes; PCA, tercis e referência do setor ajustados só no treino de cada dobra. Aproximações declaradas: as curtidas do histórico e dos rótulos foram lidas na data da coleta, não na data simulada.
-- **Referências:** (1) média histórica aritmética (o mínimo do TAPI), (2) mediana, (3) média móvel exponencial, (4) regressão sobre inscritos atuais (só no relatório). Todas com os últimos 20 posts elegíveis.
-- **Métricas:** MAE e RMSE em log, MAPE adaptado, Spearman global e intra-canal, acerto par a par dentro do canal, cobertura da faixa por modelo e por setor, com IC 95% por bootstrap de canais (2.000 reamostragens, semente 20261015).
-- **Teste final:** protocolo congelado com SHA-256 antes da consulta, **consulta única** em 18/10/2026 aos 452 vídeos de teste, depois nenhum ajuste. A seleção do modelo (LightGBM configuração A, sem CatBoost) ocorreu antes, na validação.
-- **Ablação multimodal** (histórico, histórico e legenda, mais capa, modelo completo) em corte único, com as mesmas linhas.
-- **Registro de experimentos (equivalente ao MLflow).** O projeto **não instala MLflow**. O registro é feito por manifestos com SHA-256, protocolo congelado com hash, partição e amostra congeladas e registros de decisão. O que a pessoa avaliadora **pode abrir na distribuição**: `data/models/pacote_servido=v1.json`; em cada pacote, `pacote.json` (população, atributos, parâmetros, sementes, hashes das fontes e do código, versões das bibliotecas, retenção, limitações, cobertura do procedimento), `manifesto_arquivos.json` e `ids.json`; o `manifesto.json` do dataset de referência e o `REGISTRO_REFIT.json`; o `MANIFEST.json` da distribuição. O protocolo, os JSON de resultado e os registros de decisão ficam com o autor; os números centrais estão em [docs/resultados.md](docs/resultados.md). Ver [docs/registro_de_experimentos.md](docs/registro_de_experimentos.md).
+    subgraph USO["Uso do produto"]
+        WEB["Interface Streamlit"] --> API["API Python"]
+        MCP["Servidor MCP"] --> API
+        API --> AGENTE["LangGraph: coordenar a análise"]
+        AGENTE --> RESPOSTA["Previsão, evidências e explicação"]
+    end
 
-## 7. Resultados
+    PACOTE --> AGENTE
+```
 
-Teste final retrospectivo: 452 vídeos, 16 canais, consulta única. Números lidos dos JSON da avaliação (tabelas completas em [docs/resultados.md](docs/resultados.md)).
+A interface e o MCP compartilham a API e o fluxo de previsão. Os artefatos ficam em arquivos locais, sem banco externo, fila ou backend HTTP separado. As chamadas a YouTube e Gemini dependem de configuração online explícita. Consulte a [arquitetura detalhada](docs/DOCUMENTACAO.md#arquitetura).
 
-| | MAE em log | Acerto par a par (pares distinguíveis) | Spearman intra-canal (mediana) |
-|---|---|---|---|
-| **modelo completo de vídeo** | **1,126** | **58,6%** | **0,314** |
-| média aritmética histórica | 1,637 | 51,2% | -0,030 |
-| mediana histórica | 1,220 | 51,3% | 0,058 |
-| média móvel exponencial | 1,207 | 51,9% | 0,056 |
+## Dados e modelo preditivo
 
-- Contra a **média aritmética** o modelo é favorável em erro e em acerto par a par (ICs de 95% por canal do lado favorável). Contra a **mediana** é favorável em erro (−0,094; IC −0,168 a −0,025) e em acerto par a par. Contra a **média móvel exponencial** o erro é **inconclusivo** (−0,080; IC −0,209 a 0,001); só o acerto par a par é favorável.
-- **A faixa subcobre:** 64,2% de 452 vídeos ficaram dentro dela, para 80% pretendidos (IC 50,3% a 79,8%); beleza 50,0% (4 canais); a dobra mais recente 49,7%. Não há cobertura garantida.
-- **Canais não vistos:** MAE 1,642 (média móvel 1,618): sem vantagem em erro e pior que nos canais vistos.
-- **Modelos de imagem e de texto:** reduzem o erro frente à média aritmética, mas **sem ganho de ordenação demonstrado** (acerto par a par 50,2% e 47,5%).
-- **Ganho multimodal:** o erro cai com a legenda e com o modelo completo; a **ordenação não mostra ganho** (todos os contrastes inconclusivos; a ablação não detecta efeitos pequenos).
-- Nenhuma meta de acerto percentual é prometida.
+A base foi coletada pela YouTube Data API em 14/10/2026. A amostra ativa contém **1.500 vídeos de 16 canais**, sendo 12 de automotivo e quatro de beleza, além de 100 vídeos reservados para o limiar de largura da faixa.
 
-## 8. Limitações
+O alvo é a quantidade de curtidas acumuladas na coleta para vídeos com pelo menos 30 dias de idade. Não é uma previsão de curtidas exatamente no 30º dia. O modelo aprende o desvio em escala logarítmica em relação ao histórico e converte a saída para curtidas.
 
-1. **Camada 1 local do TAPI §6.3 não atendida (desvio declarado, não resolvido).** O projeto usa capa e legenda locais mais o Gemini por URL pública; não há processamento local obrigatório de frames, transcrição local, detecção de objetos nem de cortes sobre o vídeo, porque não baixa vídeo do YouTube e não obteve os arquivos originais. **Não se afirma conformidade integral ao TAPI.**
-2. **Avaliação retrospectiva aproximada:** curtidas atuais no histórico e nos rótulos; sensibilidade 30 × 90 dias estável, o que é compatível com efeito pequeno e não prova ausência.
-3. **Base pequena e concentrada:** 16 canais, 82% automotivo, beleza com 4 canais, poucos vídeos por canal no teste.
-4. **Erro e ordenação:** vantagem clara só sobre a média aritmética; vantagem em erro sobre a mediana é pequena; contra a média móvel é inconclusiva; pior em canais não vistos.
-5. **Faixa subcalibrada** (64,2% para 80%), sem conformal; cobertura não medida no artefato servido; limiar de baixa confiança do vídeo com validade presumida e diagnóstico inconclusivo.
-6. **Transcrição do Gemini validada só qualitativamente** (exemplos inspecionados pelo autor), sem taxa de erro; o Gemini substitui o Whisper; a temperatura do Gemini é 1,0 e uma chamada por previsão não entra no intervalo.
-7. **Upload de vídeo local não foi verificado ao vivo.** Está implementado e verificado offline e com Files API simulada; a verificação real depende de um vídeo local autorizado, ainda não fornecido.
-8. **Gemini e YouTube ao vivo no pacote final:** não verificados após o refit (a última verificação ao vivo foi em 16/10 com o pacote de desenvolvimento).
-9. **Retenção:** a base, os datasets, os embeddings, os pacotes derivados das anotações e os caches têm prazo (menor: 2026-11-03T23:46:26Z). Depois dele, a demonstração, o servidor e a reprodução dependem de nova autorização ou nova coleta.
-10. **Demonstração:** 4 dos 6 canais sem confirmação de país ou idioma do Brasil (1 "US", 3 sem país), conteúdo em inglês e espanhol em parte, tipo de canal ausente e um canal prolífico sem histórico utilizável (cai na referência do setor com aviso de histórico curto). É só ilustrativa da mecânica e rotulada "de-para retrospectivo".
-11. **Licenças dos pesos de e5-small, CLIP, EasyOCR e MediaPipe: NÃO CONFIRMADAS.** Os pesos não vão na distribuição; onde conferir: [docs/dados_e_retencao.md](docs/dados_e_retencao.md).
-12. **Termos das plataformas:** métricas derivadas e agregação entre canais (YouTube) e uso do Gemini gratuito sobre URLs do YouTube são questões pendentes, declaradas; nenhuma permissão indefinida é presumida.
+O preditor local servido, **M2 / final=v2**, usa histórico e contexto mais dois embeddings visuais SigLIP 2, reduzidos por PCA a oito componentes cada: **28 colunas efetivas**. A extração também produz medidas de áudio, movimento, cortes, objetos, rosto e OCR; esses blocos foram experimentados, mas não foram selecionados para o M2 servido. Os modelos anteriores de vídeo Gemini, imagem e texto em `final=v1` são preservados.
 
-O que foi verificado ao vivo, offline com artefatos reais e com dados sintéticos está em [docs/verificado_ao_vivo_offline_sintetico.md](docs/verificado_ao_vivo_offline_sintetico.md).
+| Resultado do procedimento local | Desenvolvimento | Teste temporal reutilizado |
+|---|---:|---:|
+| MAE em log | 1,059 | 1,148 |
+| Spearman global | 0,685 | 0,738 |
+| Spearman dentro do canal, mediana | 0,029 | 0,295 |
+| Acerto entre pares distinguíveis do mesmo canal | 57,6% | 62,5% |
 
-## 9. Evolução
+O teste já havia sido consultado no projeto; a coluna da direita é **exploratória**, não um novo teste independente. Os modelos servidos foram reajustados com os 1.500 alvos e ainda não possuem medição independente em vídeos futuros. Consulte os [resultados e comparações com baselines](docs/DOCUMENTACAO.md#resultados).
 
-- Verificar o upload de vídeo local ao vivo (um arquivo vertical ou quadrado de até 180 s) e repetir a verificação do Gemini e do YouTube com o pacote final.
-- Cumprir a Camada 1 local se houver fonte autorizada de arquivos de vídeo, e validar a transcrição com taxa de erro.
-- Validação prospectiva (curtidas lidas depois da data planejada) e base maior, com mais canais e setores.
-- Calibrar a faixa (por exemplo conformal) e validar de fato a regra de baixa confiança no pacote servido.
-- Agrupar descrições audiovisuais e testar ordenação por modalidade com mais canais, para dar poder estatístico à ablação.
+## Estrutura do projeto
+
+```text
+Entrega Galaxy/
+├── src/
+│   ├── dados/                  # Coleta, snapshots, curadoria, partições, datasets e histórico
+│   ├── extracao/               # Vídeo, áudio, imagem e texto; pesos, cache e rubrica
+│   ├── modelos/                # Pré-processamento, treino, refit e pacotes servidos
+│   ├── avaliacao/              # Métricas, validação, experimentos, protocolos e avaliação final
+│   ├── agente/                 # Contratos, API (prever e ordenar), grafo, atributos e explicação
+│   ├── integracoes/            # YouTube, Gemini e servidor MCP
+│   ├── interface_web/          # Interface Streamlit e lançador
+│   ├── config.py, proveniencia.py, demonstracao.py
+│   └── preprocessador.py, refit_audiovisual_preprocessador.py   # compatibilidade de serialização
+├── configs/                   # Canais e configurações de preparação
+├── data/execucao/             # Quatro modelos servidos, pré-processadores e manifesto
+├── exemplos/                  # CSV fictício para aprender o formato de entrada
+├── docs/DOCUMENTACAO.md        # Documentação técnica unificada
+├── .streamlit/                # Configuração da interface
+├── .env.example               # Nomes das variáveis, sem credenciais
+├── executar_windows.ps1       # Preparação e execução no Windows
+├── pyproject.toml             # Dependências e comandos públicos
+├── uv.lock                    # Versões resolvidas
+└── README.md                  # Apresentação e caminho de uso
+```
+
+O módulo a módulo está no [mapa de módulos](docs/DOCUMENTACAO.md#1-arquitetura-e-responsabilidades). `data/execucao/` acompanha o clone; o snapshot de pesquisa, descrições, e-mails, caches e a base de treino não são publicados. O histórico do canal é uma entrada do usuário, assim como o vídeo, e permanece local. Modelos e pré-processadores são os mesmos da avaliação, sem novo treinamento.
+
+<a id="instalacao-do-zero"></a>
+## Instalação do zero
+
+### Pré-requisitos
+
+- Windows com PowerShell ou Linux; Python 3.12, gerenciado pelo `uv`.
+- Aproximadamente 8 GB livres para ambiente, cache e pesos; operações pesadas exigem memória livre adicional.
+- Internet para instalar dependências e baixar os pesos oficiais. Após preparar os artefatos, a rota local funciona offline.
+- Um vídeo próprio e histórico autorizado do canal para analisar; o CSV de exemplo é fictício.
+
+### 1. Preparar o ambiente no Windows
+
+Abra o PowerShell na pasta `Entrega Galaxy`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 preparar
+```
+
+O lançador prepara o Python 3.12 e o ambiente `.venv-windows` pelo lockfile. Se necessário, instala o `uv` localmente, sem alterar o PATH global.
+
+### 2. Conferir os modelos incluídos
+
+O clone já contém os quatro pacotes em `data/execucao/modelos/` e o manifesto `data/execucao/manifesto.json`. Não existe download separado de dados/modelos. Os modelos são carregados com verificação de integridade. O histórico deve conter pelo menos cinco posts com curtidas, publicados pelo menos 30 dias antes da data planejada; inclua também posts recentes para calcular a cadência. Sem referência suficiente, o sistema recusa a previsão em vez de inventar um histórico setorial.
+
+### 3. Obter os pesos oficiais
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 baixar
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 preparar-av
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 verificar
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 verificar-av
+```
+
+Os downloads de legenda/capa somam cerca de 1,2 GB e os audiovisuais cerca de 2,1 GB. Os pesos de terceiros são obtidos das fontes oficiais pelos comandos acima. O serviço completo usa os dois conjuntos; a extração audiovisual isolada usa apenas o segundo.
+
+### 4. Abrir a interface
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 app
+```
+
+Acesse `http://127.0.0.1:8501` e mantenha o terminal aberto. Se a porta estiver ocupada, inicie uma nova instância em outra porta:
+
+```powershell
+.\.venv-windows\Scripts\python.exe -m src.interface_web.lancar --porta 8502 --abrir-navegador
+```
+
+No Linux, use `uv sync --locked` e siga as instruções de [bibliotecas e pesos](docs/DOCUMENTACAO.md#instalacao); depois execute `uv run casegalaxy-interface --abrir-navegador`. Não compartilhe o ambiente virtual entre Linux e Windows.
+
+<a id="testes-e-avaliacoes"></a>
+## Testes e avaliações
+
+O projeto separa três tipos de evidência: testes com componentes simulados, integração com modelos e mídia reais e avaliação estatística dos dados. Um teste funcional aprovado não mede acerto preditivo.
+
+A seleção para o GitHub foi verificada em cópia limpa, sem o snapshot coletado: os quatro pacotes carregam, a página abre e a previsão local real, o ranking e os comparáveis do histórico informado funcionam. O formulário/adaptador e o MCP stdio retornaram os mesmos números da função Python. Os **148 testes pertinentes** passaram. Os 24 binários de modelos e pré-processadores permanecem idênticos; para a mesma entrada, quantis, referência e SHAP coincidem com a instalação de pesquisa. Essa verificação reaproveitou extrações reais por hash/configuração; não mediu novamente a extração a frio.
+
+A rota local, a integração interface → API → modelo real (**14/14 verificações aprovadas**) e o lançador `prever-video` foram verificados no Windows nativo com a versão final do código, com números iguais entre função, grafo, chamada direta, recarga e MCP stdio. A previsão local e o ranking de dois vídeos do mesmo canal rodaram por MCP, offline e sem Gemini (rota `video_local`, `final=v2`). Os dois arquivos compartilham a imagem de origem e o canal é hipotético, de modo que é uma demonstração funcional: as estimativas centrais coincidiram e o resultado não indica qualidade de ordenação.
+
+A suíte completa de referência no Windows nativo registrou **2.060 aprovados, 0 falhas, 0 erros e 5 ignorados** (522 s). Quatro testes ignorados dependem de CatBoost, que não integra o produto servido; o quinto trata de permissões de arquivo específicas do sistema e possui cobertura equivalente por simulação. A preparação da execução pelo repositório foi validada pelos 148 testes pertinentes e integrações descritos acima; a suíte completa não foi repetida nessa etapa. Os testes opcionais de comparação com CatBoost não estão aprovados na versão atual. Consulte o [alcance das verificações](docs/DOCUMENTACAO.md#verificacoes).
+
+Para conferir o ambiente preparado:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 verificar
+powershell -NoProfile -ExecutionPolicy Bypass -File .\executar_windows.ps1 verificar-av
+```
+
+`demo` e `salvas` são utilitários de reprodução da pesquisa e exigem os artefatos privados correspondentes; não são etapas da instalação pública. O [guia técnico](docs/DOCUMENTACAO.md#verificacoes) registra o alcance e os limites de cada verificação, sem transformar contagens antigas em resultados atuais.
+
+Os detalhes de [limitações e requisitos](docs/DOCUMENTACAO.md#limitacoes), [evolução](docs/DOCUMENTACAO.md#evolucao) e [retenção e licenças](docs/DOCUMENTACAO.md#dados-e-retencao) ficam na documentação técnica.

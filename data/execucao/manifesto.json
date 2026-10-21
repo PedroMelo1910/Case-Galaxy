@@ -1,0 +1,88 @@
+{
+  "tipo": "pacote_servido",
+  "versao_do_manifesto": 2,
+  "ativo": {
+    "rotulo": "final=v2",
+    "layout": "final",
+    "motivo": "Preditor local de vídeo (atributos audiovisuais extraídos localmente, sem Gemini) acrescentado ao conjunto final=v1; vídeo, imagem e texto de final=v1 mantidos",
+    "pacotes": {
+      "video": {
+        "pasta": "data/execucao/modelos/video",
+        "sha256_pacote_json": "95693d7d0b59d2bd19553e5e3867783b4a38db962031fd2c8fa8aeeb72420469",
+        "identidade_sha256": "e4646c2564ebefe3c7e4b474f99402e31a1deaa437cb419fd6a4a43bc131b602",
+        "versao_servida": "final=v1/video-6bb801f43992-c62b81db",
+        "limiar": {
+          "arquivo": "limiar/limiar_largura_servido.json",
+          "sha256_arquivo": "b03b85fdc4577e1fd0b93e69fe01790e6f6b930c485995b87e1e60ce8b94bf9b",
+          "valor_log": 2.9733491985626253,
+          "percentil": 80.0,
+          "n": 100,
+          "papel": "servido",
+          "sha256_pacote": "e4646c2564ebefe3c7e4b474f99402e31a1deaa437cb419fd6a4a43bc131b602",
+          "ids_sha256": "e59ed97e446a472f99c654819d764a018eb1f19645dec4f88b117404ad4c6656",
+          "diagnostico_de_desenvolvimento": {
+            "arquivo": "diagnostico_desenvolvimento.json",
+            "sha256_arquivo": "66f85acb32912ffe0854572db9d4eada64848b7fb31548862eec094b8c3be7eb",
+            "leitura": "inconclusivo",
+            "limiar_de_desenvolvimento_log": 2.424038757283177,
+            "pacote_de_desenvolvimento": "95f1359cad04b8fad54967051d682b86f3a692699bd6569167a8dd62ccae85ac",
+            "n_sinalizados": 42,
+            "n_nao_sinalizados": 175,
+            "mae_sinalizados": 2.282637466156901,
+            "mae_nao_sinalizados": 0.893921330568046,
+            "ic95_da_diferenca": [
+              -0.14806451511907742,
+              2.2153401612927803
+            ],
+            "n_validacao": 217
+          }
+        }
+      },
+      "imagem": {
+        "pasta": "data/execucao/modelos/imagem",
+        "sha256_pacote_json": "828a388b3baa1125026fe6a1765192bb4b0f4868832ca1051f24b2115b027be1",
+        "identidade_sha256": "058ab362bc183e9447e86e4da2ca158b41d2c2afc53d31ed331b420e4d8e9fec",
+        "versao_servida": "final=v1/imagem-361551e0e0f7-c62b81db",
+        "limiar": null
+      },
+      "texto": {
+        "pasta": "data/execucao/modelos/texto",
+        "sha256_pacote_json": "2d2062f664f14b76282d574f88878a9381373a7313e2d8e79bfd6d4113e14bef",
+        "identidade_sha256": "983c711984f0eb960fe2133341e0bd8647a25fecd61b163512b2f4af1b7862b4",
+        "versao_servida": "final=v1/texto-05fb7d7a5f8f-c62b81db",
+        "limiar": null
+      },
+      "video_local": {
+        "pasta": "data/execucao/modelos/video_local",
+        "sha256_pacote_json": "9b333aad9f59c2169c2769a48fe4793d478b3ea606b38c2169915797e78ea44a",
+        "identidade_sha256": "e31c2997301ca5259d5c03b65e4efd59359ded4ce0bcc41e1ec1611bd5bba3c3",
+        "versao_servida": "final=v2/video_local-1e8bdbcdd4c1-M2_c62b81db",
+        "limiar": {
+          "arquivo": "limiar/limiar_largura_servido.json",
+          "sha256_arquivo": "96edfc3b8f4f6c29676f9675936789b0464e5945adb76690d78f69a24fb58686",
+          "valor_log": 2.6120908344016516,
+          "percentil": 80.0,
+          "n": 100,
+          "papel": "servido",
+          "sha256_pacote": "e31c2997301ca5259d5c03b65e4efd59359ded4ce0bcc41e1ec1611bd5bba3c3",
+          "ids_sha256": "e59ed97e446a472f99c654819d764a018eb1f19645dec4f88b117404ad4c6656",
+          "diagnostico_de_desenvolvimento": {}
+        }
+      }
+    },
+    "dataset_de_referencia": {
+      "pasta": "data/execucao",
+      "papel": "contexto autorizado fornecido na execução"
+    },
+    "base_historica": {
+      "pasta": "data/execucao"
+    },
+    "ativado_em_utc": "2026-10-21T08:56:17Z",
+    "contexto_execucao": {
+      "treino_ate_utc": "2026-09-13T23:29:47Z",
+      "arquivo_opcional": "data/privado/contexto.json",
+      "snapshot_de_pesquisa_incluido": false
+    }
+  },
+  "anteriores": []
+}
