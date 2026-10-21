@@ -89,7 +89,6 @@ def adaptador_real() -> ad.AdaptadorReal:
     return ad.AdaptadorReal(servicos_reais, [uploads.pasta_base()], raiz=RAIZ_PROJETO, online=ad.modo_online_ligado())
 
 
-@st.cache_resource(show_spinner=False)
 def adaptador_salvo() -> ad.AdaptadorSalvo | None:
     try:
         return ad.AdaptadorSalvo.padrao(RAIZ_PROJETO)
@@ -163,6 +162,9 @@ def analisar(entrada: EntradaFormulario, canais: dict[str, CanalBase], conteudo:
     return ResultadoAnalise(envelope, False, adaptador.origem)
 
 
-def reproduzir(url: str, adaptador: Adaptador) -> ResultadoAnalise:
+def reproduzir(url: str, adaptador: Adaptador, *, video_id: str | None = None) -> ResultadoAnalise:
     """Reprodução de uma resposta salva (nunca conta como nova previsão)."""
-    return ResultadoAnalise(adaptador.prever(pedido_de_resposta_salva(url)), False, adaptador.origem)
+    pedido = pedido_de_resposta_salva(url)
+    if video_id:
+        pedido["own_video_id"] = video_id
+    return ResultadoAnalise(adaptador.prever(pedido), False, adaptador.origem)

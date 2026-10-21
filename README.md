@@ -71,6 +71,8 @@ flowchart TD
 
 A interface recebe um arquivo de vídeo por análise. A função Python e o MCP também aceitam imagem, texto e URL pública, além do pedido de ranking. Para ordenar de dois a cinco criativos compatíveis, o agente percorre esse fluxo para cada item e ordena as previsões centrais.
 
+As previsões concluídas na interface são salvas automaticamente em `data/privado/respostas_salvas/`, fora do Git. Use **Reprodução de resposta salva** para revê-las após reabrir o aplicativo, sem executar novamente o modelo. A pasta é criada no primeiro salvamento; não é necessário copiar arquivos manualmente.
+
 O LightGBM calcula os números. No modo online, um LLM pode redigir a explicação, que é validada contra os valores calculados; no modo offline, o texto é determinístico. Nenhuma explicação altera a previsão.
 
 ## Arquitetura de software

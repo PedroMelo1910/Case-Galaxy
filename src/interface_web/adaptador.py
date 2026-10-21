@@ -9,12 +9,13 @@ import re
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
 from src.agente.contratos import Codigo, envelope_erro, ErroAgente, video_id_da_url
 from src.config import RAIZ_PROJETO
-from src.demonstracao import ler_respostas, PASTA_DEMONSTRACAO, PASTA_RESPOSTAS
+from src.demonstracao import ErroDemonstracao, ler_respostas, gravar_respostas, PASTA_DEMONSTRACAO, PASTA_RESPOSTAS
 from src.interface_web.textos import ocultar_caminhos
 
 
@@ -169,6 +170,34 @@ class RespostaSalva:
     resposta: dict
     ressalvas: tuple[dict, ...]
     resultado_conhecido: dict | None
+    gravacao: dict | None = None
+
+
+def salvar_previsao(envelope: dict, *, nome: str, setor: str, contexto: str,
+                    sha_video: str, raiz: Path | None = None) -> Path | None:
+    """Guarda apenas resultados de sucesso, sem vídeo ou CSV, na pasta privada local.
+
+    A chave inclui conteúdo, contexto e resposta; repetir o mesmo resultado não cria cópias.
+    """
+    if not envelope.get("success") or not isinstance(envelope.get("data"), dict):
+        return None
+    dados = envelope["data"]
+    if dados.get("predicted_metric") is None:
+        return None
+    chave = hashlib.sha256(json.dumps([sha_video, setor, contexto, envelope], sort_keys=True,
+                                     ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+    destino = (Path(raiz) if raiz is not None else RAIZ_PROJETO) / "data/privado/respostas_salvas" / f"{chave}.json"
+    if destino.exists():
+        return destino
+    registro = {
+        "formato": 1, "rotulo": "Previsão salva neste computador",
+        "aviso": "Reprodução do resultado anterior; nenhum modelo é executado ao reproduzir.",
+        "gerado_em_utc": datetime.now(UTC).isoformat(),
+        "versao_servida": dados.get("model_version"),
+        "criativos": [{"video_id": chave, "setor": setor,
+                       "canal": {"titulo": nome}, "url": "", "resposta": envelope}],
+    }
+    return gravar_respostas(registro, destino)
 
 
 def arquivo_de_respostas_padrao(raiz: Path = RAIZ_PROJETO) -> Path:
@@ -185,15 +214,38 @@ class AdaptadorSalvo:
     origem = ORIGEM_SALVA
     rotulo = ROTULO_SALVA
 
-    def __init__(self, arquivo: Path) -> None:
-        arquivo = Path(arquivo)
-        self._sha256 = hashlib.sha256(arquivo.read_bytes()).hexdigest()
-        self._dados = ler_respostas(arquivo)
-        self._por_id = {c["video_id"]: c for c in self._dados.get("criativos", ())}
+    def __init__(self, arquivo: Path, adicionais: Sequence[Path] = ()) -> None:
+        arquivos = [Path(arquivo), *adicionais]
+        self._sha256 = hashlib.sha256(b"".join(a.read_bytes() for a in arquivos)).hexdigest()
+        self._dados = ler_respostas(arquivos[0])
+        self._por_id = {}
+        self._gravacoes = {}
+        for a in arquivos:
+            dados = ler_respostas(a)
+            for c in dados.get("criativos", ()):
+                self._por_id[c["video_id"]] = c
+                self._gravacoes[c["video_id"]] = {k: dados.get(k) for k in ("gerado_em_utc", "rotulo", "aviso")}
 
     @classmethod
     def padrao(cls, raiz: Path = RAIZ_PROJETO) -> "AdaptadorSalvo":
-        return cls(arquivo_de_respostas_padrao(raiz))
+        locais = sorted((Path(raiz) / "data/privado/respostas_salvas").glob("*.json"))
+        # Um arquivo local incompleto não impede a leitura dos demais resultados.
+        validos = []
+        for a in locais:
+            try:
+                dados = ler_respostas(a)
+                if all(isinstance(c, dict) and all(k in c for k in ("video_id", "setor", "url", "resposta"))
+                       for c in dados.get("criativos", ())):
+                    validos.append(a)
+            except (OSError, ValueError, KeyError, AttributeError, TypeError, ErroDemonstracao):
+                logger.warning("Não foi possível ler uma resposta salva local.")
+        try:
+            validos.insert(0, arquivo_de_respostas_padrao(raiz))
+        except FileNotFoundError:
+            pass
+        if not validos:
+            raise FileNotFoundError("Nenhum arquivo de respostas salvas encontrado.")
+        return cls(validos[0], validos[1:])
 
     def identidade(self) -> str:
         return f"salvo:{self._sha256[:16]}"
@@ -207,13 +259,15 @@ class AdaptadorSalvo:
         return tuple(RespostaSalva(
             video_id=c["video_id"], setor=c["setor"], canal_titulo=(c.get("canal") or {}).get("titulo") or "canal sem título",
             url=c["url"], resposta=c["resposta"], ressalvas=tuple(c.get("ressalvas", ())),
-            resultado_conhecido=c.get("resultado_conhecido")) for c in self._por_id.values())
+            resultado_conhecido=c.get("resultado_conhecido"), gravacao=self._gravacoes[c["video_id"]])
+            for c in sorted(self._por_id.values(),
+                            key=lambda c: self._gravacoes[c["video_id"]].get("gerado_em_utc") or "", reverse=True))
 
     def prever(self, pedido: dict) -> dict:
         video_id = None
         if isinstance(pedido, dict):
             criativo = pedido.get("creative") or {}
-            video_id = video_id_da_url(criativo.get("url")) or pedido.get("own_video_id")
+            video_id = pedido.get("own_video_id") or video_id_da_url(criativo.get("url"))
         salvo = self._por_id.get(video_id) if video_id else None
         if salvo is None:
             return _erro(Codigo.ENTRADA_INVALIDA, "Não há resposta salva para este vídeo.")
